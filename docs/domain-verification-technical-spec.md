@@ -3,7 +3,7 @@
 ## Technical specification
 
 **Status:** Complete, open to iteration
-**Date:** September 4, 2026
+**Date:** September 5, 2026
 **Related documents:** [Product brief](domain-verification-product-brief.md) · [Challenge description](challenge-description.md)
 
 This document is the engineering counterpart to the product brief. The brief owns the user problem, principles, priorities, scope, and product decisions. This document owns architecture, API contracts, state modeling, persistence, and security. Where the two overlap, this document is authoritative on mechanism and the brief is authoritative on intent.
@@ -16,19 +16,21 @@ This document is the engineering counterpart to the product brief. The brief own
 - **Client data:** TanStack Query for server-state reads, mutations, cache invalidation, and request feedback.
 - **Backend:** Next.js route handlers. Server actions are not used for the claim workflow, so the verification surface stays a plain, testable HTTP boundary.
 - **Identity:** Clerk.
-- **Persistence:** Supabase Postgres, reached only from backend code through Supabase's Data API. Every query carries the caller's Clerk session token, which Supabase verifies as a third-party auth provider, and row-level security policies on the table decide what that request may read or write.
+- **Persistence:** Supabase Postgres, reached only from backend code through Supabase's Data API. Reads use the user's Clerk session token; writes use a separate client holding the server's secret key. See [Authorization](#authorization).
 - **DNS:** A small adapter around `node:dns/promises`, keeping product-level result classification separate from resolver details.
-- **UI:** Tailwind CSS and stock shadcn/ui components. No bespoke design system; see the [Claude Design prompt](claude-design-prompt.md).
+- **UI:** Tailwind CSS and stock shadcn/ui components. No bespoke design system.
 - **Deployment:** One Vercel deployment containing the frontend and route-handler backend, with Supabase as persistent storage.
 
 ### Terminology
 
+- **Claim:** One account's association with one domain, from creation through verification. Every row is a claim. Resend uses the same word for the narrower act of taking a domain from another team; here that is a takeover.
 - **Domain verification:** The complete journey from entering a domain to creating a persistent verified association.
 - **DNS setup:** The user action of publishing the generated TXT challenge.
 - **Verification check:** One backend DNS lookup requested by the client.
-- **Latest check result:** The most recent failed verification check, persisted only to guide the next user action.
+- **Latest check result:** The most recent check that did not complete verification, persisted only to guide the next user action.
 - **Verified domain:** A domain persistently associated with an account after a successful check.
 - **Superseded claim:** A claim that was verified once but whose association was ended by a later proof from another account.
+- **Takeover:** A successful proof by one account that ends another account's current association with the same domain.
 
 ### Component responsibilities
 
@@ -36,7 +38,7 @@ This document is the engineering counterpart to the product brief. The brief own
 
 **Frontend** collects the domain and displays validation feedback, presents one copyable DNS instruction, requests verification / correction / deliberate token replacement, and renders the derived claim state and latest check result. It never decides that a domain is verified. It reads and mutates exclusively through TanStack Query against the route-handler API.
 
-**Backend** derives the user identifier from the authenticated session and never trusts a client-supplied owner ID. It normalizes and validates domains, creates and expires challenges, performs public DNS TXT lookups, classifies DNS results into product-level outcomes, atomically creates the verified association, and authorizes every claim read and mutation.
+**Backend** derives the user identifier from the authenticated session and never trusts a client-supplied owner ID. It normalizes and validates domains, creates and expires challenges, performs public DNS TXT lookups, classifies DNS results into product-level outcomes, atomically creates the verified association, and authorizes every claim read and mutation. It is the only holder of the credential that can write to the database.
 
 **Database** persists the pending challenge, latest check result, and verified association; enforces exclusivity for verified normalized domains; and provides the authoritative state after concurrent verification attempts.
 
@@ -57,9 +59,9 @@ interface ClaimView {
   tokenExpiresAt: string;          // ISO 8601
   verifiedAt: string | null;
   supersededAt: string | null;
-  lastCheck: LastCheckView | null; // same union, checkedAt as ISO 8601
+  lastCheck: LastCheckView | null; // same union, dates as ISO 8601
   state: ClaimViewState;           // derived on the server
-  tookOverFromAnotherAccount: boolean;
+  tookOverAt: string | null;       // set when this proof displaced another account
   createdAt: string;
 }
 ```
@@ -70,28 +72,17 @@ Three things about that shape are load-bearing.
 
 **`state` is computed on the server** by `getClaimViewState`, not recomputed in the browser. The client renders what it is told. Two implementations of the same priority ladder would eventually disagree, and the one in the browser would be the wrong one to trust.
 
-**`tookOverFromAnotherAccount` is computed per request, not stored.** There is no stored column: `DomainClaim` is the persisted row and does not carry it, while `ClaimView` is a response projection that does. It is included because it cannot be derived from the caller's own row — see below.
+**`tookOverAt` is stored on the winner's row**, written by the transfer transaction itself. It is the only fact about another account that a claim carries, and it is a timestamp rather than a reference, so it survives the other account deleting its row and needs no privileged read — see below.
 
 ### Takeover disclosure
 
-A pending claim never reveals whether another account holds the domain; otherwise authenticated users could enumerate customer domains without proving control. A held and an unheld domain therefore return the same `setup_required` view. A successful proof may disclose that an association moved, but never identifies either account.
+The verified view shows the new holder's takeover note only during the ten minutes after `tookOverAt`. A client timer hides it while the page remains open, and a return visit uses the original timestamp rather than restarting the window. This is presentation only: it changes neither the stored timestamp nor transfer eligibility. The previous holder's superseded explanation does not expire on this timer.
 
-`supersededAt` records that the caller's own claim lost the association. `tookOverFromAnotherAccount` tells a currently verified caller that its proof replaced another account's association. The latter cannot be derived from the caller's row, so the database computes it per request:
+Nothing about another account's claim is disclosed before a valid proof; otherwise authenticated users could enumerate customer domains without proving control. A held and an unheld domain therefore return the same `setup_required` view, and every pending check returns the same diagnoses. After a valid proof the response may say that the domain moved, but never identifies any account.
 
-```sql
-create function took_over_from_another_account(c domain_claims)
-returns boolean language sql stable security definer as $$
-  select is_currently_verified(c.verified_at, c.superseded_at)
-     and exists (
-       select 1 from domain_claims other
-        where other.normalized_domain = c.normalized_domain
-          and other.owner_id <> c.owner_id
-          and other.superseded_at is not null
-     );
-$$;
-```
+`supersededAt` records that the caller's own claim lost the association. `tookOverAt` records that the caller's proof ended another account's association, and when. The transfer transaction writes it on the winning row in the same statement that supersedes the loser: the transaction time if a holder was displaced, otherwise null. The same transaction clears it on the loser's row, so a claim carries at most one of the two facts: `tookOverAt` means this claim displaced someone and still holds the domain, `supersededAt` means someone displaced this claim. The database enforces that they are never both set.
 
-The outer `is_currently_verified` predicate keeps the value false for every pending claim. The function runs as the table owner so it can inspect rows hidden by row-level security, but it returns only a boolean. It is presentational only and must never gate claim creation or verification; exclusivity remains the transaction and partial unique index's responsibility.
+Resend's own Domain Claim discloses the conflict before proof, because its claim flow uses different records from its ordinary add flow and the user has to be routed. Here both paths are the same instruction, so a pending claimant loses nothing by not knowing.
 
 ### Routes
 
@@ -111,7 +102,7 @@ All ownership comes from the server session. Request bodies never accept an `own
 
 ### `POST /verify` returns 200 for every classified outcome
 
-A missing record, a mismatched value, and a resolver timeout are all **successful checks with negative results**, not failed requests. They return `200` with the updated `ClaimView`, and the client replaces its cache entry with the response. Only an unclassified failure is a `5xx`.
+A missing record, a mismatched value, and a resolver timeout are all **successful checks that did not complete verification**, not failed requests. They return `200` with the updated `ClaimView`, and the client replaces its cache entry with the response. Only an unclassified failure is a `5xx`.
 
 This keeps a large ambiguity out of the client: it never has to decide whether a non-2xx means "your DNS is wrong" or "our server is broken." An expired token is also `200` — the request is rejected before any DNS lookup, and the returned view simply carries `state: "expired"`, which is the state the UI already knows how to render.
 
@@ -138,7 +129,7 @@ type ErrorCode =
   | "unauthenticated"
   | "not_found"
   | "invalid_domain"
-  | "claim_verified"
+  | "claim_locked"
   | "internal_error";
 ```
 
@@ -147,7 +138,7 @@ type ErrorCode =
 | `unauthenticated` | `401` | all | No valid session. |
 | `not_found` | `404` | `:id` routes | No such claim, **or** it belongs to someone else. |
 | `invalid_domain` | `400` | `POST`, `PATCH` | Failed normalization or eligibility. `message` carries the specific reason. |
-| `claim_verified` | `409` | `PATCH` | The domain of a currently verified claim cannot be edited. |
+| `claim_locked` | `409` | `PATCH` | The claim is verified or superseded, so its domain cannot be edited. |
 | `internal_error` | `500` | all | Unclassified. `message` is generic; detail goes to logs under `requestId`. |
 
 Another account's claim returns `404`, never `403`. A `403` would confirm the claim exists, which is a disclosure in its own right.
@@ -166,7 +157,7 @@ Value: <64-character lowercase hexadecimal token>
 TTL:   Auto or provider default
 ```
 
-The dedicated name avoids unrelated TXT records at the root `@`, which commonly already carries SPF, site-verification, and other values. Because `_resend-verify` already communicates the record's purpose, the value contains only the random token with no `resend-verify=` prefix. The leading underscore signals that the name holds service metadata rather than a host.
+The dedicated name avoids unrelated TXT records at the root `@`, which commonly already carries SPF, site-verification, and other values. Because `_resend-verify` already communicates the record's purpose, the value contains only the random token with no `resend-verify=` prefix. The leading underscore signals that the name holds service metadata rather than a host. Resend's own Domain Claim makes the other choice, a prefixed value at the apex, where the prefix is what makes the record findable among the values already there; the cost of a dedicated name is the host field, which some providers auto-append the domain to, and the `record_not_found` guidance accounts for that.
 
 The resolver always appends `_resend-verify` to the exact normalized domain being claimed, with no fallback to the parent. A claim for `news.recomendei.me` therefore queries `_resend-verify.news.recomendei.me`. The full hostname is canonical and is always shown alongside the record name, so the user can confirm what their provider produced.
 
@@ -212,6 +203,7 @@ interface DomainClaim {
   tokenExpiresAt: Date;
   verifiedAt: Date | null;
   supersededAt: Date | null;
+  tookOverAt: Date | null;
   lastCheck: LastCheck | null;
   createdAt: Date;
   updatedAt: Date;
@@ -226,10 +218,12 @@ The database enforces one row per `(ownerId, normalizedDomain)` pair and a parti
 
 `verifiedAt` and `supersededAt` are not redundant. `verifiedAt` records the historical fact that this account proved DNS control at that moment, and stays true even after the domain moves. `supersededAt` records that a later proof by another account ended the association. **A claim is currently verified only when `verifiedAt` is set and `supersededAt` is null.** A row carrying both is superseded, and superseded is not verified.
 
-`verifiedAt` remains set after supersession because it records a historical event. The database enforces that only a previously verified claim can be superseded:
+`verifiedAt` remains set after supersession because it records a historical event. `tookOverAt` and `supersededAt` are the two sides of one event and are mutually exclusive: winning sets the first and clears the second, losing sets the second and clears the first. The database enforces all three rules:
 
 ```sql
 CHECK (superseded_at IS NULL OR verified_at IS NOT NULL)
+CHECK (took_over_at IS NULL OR verified_at IS NOT NULL)
+CHECK (took_over_at IS NULL OR superseded_at IS NULL)
 ```
 
 The compound definition of "currently verified" lives in one named SQL function and one TypeScript helper rather than being repeated at call sites.
@@ -242,14 +236,14 @@ Before creating a challenge, the backend:
 
 1. Converts the input to the canonical ASCII DNS representation (IDNA) and lowercase.
 2. Removes a trailing DNS dot.
-3. Rejects schemes, paths, queries, fragments, ports, IP addresses, local names such as `localhost`, malformed labels, and public suffixes that cannot be privately controlled. When a URL prefix is present, return: "Please enter the domain without the URL prefix (e.g., example.com instead of https://example.com)."
+3. Rejects schemes, paths, queries, fragments, ports, IP addresses, local names such as `localhost`, malformed labels, and a pragmatic set of common public suffixes that cannot be privately controlled. This set is deliberately limited rather than a complete implementation of the Public Suffix List. When a URL prefix is present, return: "Please enter the domain without the URL prefix (e.g., example.com instead of https://example.com)."
 4. Preserves the exact registrable domain or subdomain the user intends to claim.
 
 Normalization is implemented **once** in shared TypeScript rather than independently in the browser and backend. The frontend may provide early feedback, but the backend performs authoritative validation using the same module.
 
 If the user corrects a misspelled domain, `PATCH` **edits the existing row in place**: it writes the new normalized domain, issues a fresh token and expiry, and clears `lastCheck`. The claim keeps its id, so the page the user is on stays the page they are on, and a typo does not leave an abandoned row behind in their domain list.
 
-Editing is refused with `claim_verified` when the claim is currently verified, because silently repointing a verified association at a different domain would grant control the user never proved. Such a user deletes the claim and adds the correct domain instead. If the corrected domain is one the user already has a claim for, the edit is refused as `invalid_domain` with a message saying so, rather than creating a second row that would violate the `(ownerId, normalizedDomain)` constraint.
+Editing is refused with `claim_locked` when the claim is verified or superseded. Repointing a verified association at a different domain would grant control the user never proved, and a superseded row carries `verifiedAt` and `supersededAt` that describe the old domain, so an edit would show the new domain as having moved to another account. Only a row that has never verified can be edited, which is why the update touches no history fields. Such a user deletes the claim and adds the correct domain instead; the UI hides the edit control in both cases. If the corrected domain is one the user already has a claim for, the edit is refused as `invalid_domain` with a message saying so, rather than creating a second row that would violate the `(ownerId, normalizedDomain)` constraint.
 
 ### DNS lookup and matching
 
@@ -293,19 +287,33 @@ function getClaimViewState(claim: DomainClaim, now: Date): ClaimViewState {
 
 `setup_required` means only that the current challenge has not been checked and must not render as an error. `checking` is transient frontend request state and is never persisted.
 
-Verification success is represented by `verifiedAt` together with a null `supersededAt`; it takes precedence over token expiry and does not depend on the TXT record remaining in DNS. A successful match does not also need to be written to `lastCheck`. No attempt counter or attempt history is persisted.
+Verification success is represented by `verifiedAt` together with a null `supersededAt`; it takes precedence over token expiry and does not depend on the TXT record remaining in DNS. A successful verification clears `lastCheck`. No attempt counter or attempt history is persisted.
 
 ### Reassignment and atomicity
 
-After DNS matches, the route calls one Postgres function. The function completes the transfer in a single transaction:
+After DNS matches, the route calls one Postgres function, `verify_domain_claim(claim_id, owner_id, token)`, through the server-only client. The function completes the transfer in a single transaction, on the database clock:
 
-1. Lock and reload the winning claim.
-2. Confirm its owner, token, and expiry still match what the route checked.
-3. Mark the current active claim as superseded and expire its token.
-4. Mark the winning claim as verified.
-5. Return the committed claim.
+1. Lock and reload the winning claim by id and owner.
+2. Confirm its token and expiry still match what the route checked.
+3. Lock the domain's current active holder, if there is one.
+4. Mark any other current holder as superseded, clear its `tookOverAt`, and expire its token.
+5. Mark the winning claim as verified, clear `supersededAt` and `lastCheck`, and set `tookOverAt` to the transaction time if a holder was displaced and null otherwise.
+6. Return the committed claim.
 
 If any step fails, every write rolls back. The application never makes separate “remove old owner” and “add new owner” requests.
+
+What each row ends up with after a successful takeover:
+
+| Field | Winner's row | Previous holder's row |
+| --- | --- | --- |
+| `verifiedAt` | now | kept, as history |
+| `supersededAt` | cleared | now |
+| `tookOverAt` | now | cleared |
+| `tokenExpiresAt` | unchanged | now, so the old TXT value is dead |
+| `lastCheck` | cleared | unchanged |
+| Resulting state | `verified` | `superseded` |
+
+Every other account's pending claim for the same domain is untouched. A plain first verification, with no holder to displace, is the first column with `tookOverAt` left null and no second row.
 
 The token is checked again because it could be replaced while the DNS lookup is running. Pending claims held by other accounts are left unchanged. A superseded claim keeps its history but must generate a new token before it can verify again.
 
@@ -320,7 +328,7 @@ WHERE verified_at IS NOT NULL
 
 The `WHERE` clause excludes pending and superseded rows. Among the remaining active rows, each normalized domain may appear only once. If concurrent requests would break that rule, Postgres rejects one transaction. The losing route reloads the authoritative claim and returns it as an ordinary `200` — the claim is genuinely still pending, and looks like any other pending claim. No new error code is introduced, and the raw database error is never exposed.
 
-The transaction performs the transfer; the unique index is the final safety net. An advisory lock is not required for the MVP.
+The transaction performs the transfer; the unique index is the final safety net. An advisory lock is not required for the MVP. A later check performs a new DNS lookup and may transfer the domain again if its active token matches.
 
 ### Token expiry
 
@@ -346,12 +354,12 @@ Every outcome maps to one user decision. Messages are product surface, not debug
 | `superseded` | Another account later proved control | Show when it moved and offer a fresh challenge; never identify the winner |
 | Unexpected failure | An outcome cannot be classified | Show the generic API message and request ID; preserve the claim and token for retry |
 
-Starting or failing a competing claim never affects the current association. A successful takeover leaves other pending claims untouched. The previous holder learns of the change on its next visit; notifications and grace periods are out of scope.
+Starting or failing a competing claim never affects the current association. A successful takeover leaves other pending claims untouched. The previous holder learns of the change on its next visit; notifications are out of scope.
 
 ### Authorization
 
-- Every Data API query carries the Clerk session token. Row-level security compares the token's `sub` to `owner_id` for reads and mutations; route handlers also filter by owner.
-- `verify_domain_claim` and `took_over_from_another_account` run as the table owner because takeover requires narrowly scoped cross-account access. They derive the caller from the session token and never accept a caller-supplied owner ID.
+- Reads use the user's Clerk session token. The database grants that role select only, and row-level security limits it to the caller's own rows.
+- Writes use a separate client holding the server's secret key, and route handlers filter every write by the session's owner. The route handlers are therefore the only thing that can create, update, or verify a claim; `verify_domain_claim` is executable only by that role.
 - Foreign and missing claims both return `404`. No API response identifies another account.
 - Pending or failed claims grant no authority. Only a valid DNS proof may atomically move an active association; a superseded row remains readable by its owner but confers no control.
 - Database access uses the Data API query builder rather than string-built SQL.
@@ -360,7 +368,7 @@ Starting or failing a competing claim never affects the current association. A s
 
 - Log unexpected server failures against the response's request ID.
 - Persist only the latest classified check on the claim; there is no attempt history or audit log.
-- Never log Clerk session tokens or authentication secrets.
+- Never log Clerk session tokens, the Supabase secret key, or other authentication secrets.
 - Bound and sanitize DNS values before logging, storing, or displaying them. Treat DNS observations as untrusted, potentially large input.
 - Never expose raw resolver codes, database errors, stack traces, or another account's identity.
 - Never claim that DNS control establishes legal ownership.

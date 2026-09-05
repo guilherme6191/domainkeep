@@ -3,9 +3,9 @@
 ## Product brief
 
 **Status:** Complete, open to iteration
-**Date:** September 4, 2026
+**Date:** September 5, 2026
 **Delivery window:** One week
-**Related documents:** [README](../README.md) · [Technical specification](domain-verification-technical-spec.md) · [Challenge description](challenge-description.md) · [Design prompt](claude-design-prompt.md)
+**Related documents:** [README](../README.md) · [Technical specification](domain-verification-technical-spec.md) · [Challenge description](challenge-description.md)
 
 This document states the user problem, principles, and decisions — the *why* and the *what*, kept terse. Mechanism lives in the [technical specification](domain-verification-technical-spec.md). Tradeoff reasoning already written up for a reader lives in the [README](../README.md#tradeoffs-and-limitations) and is not repeated here.
 
@@ -40,7 +40,7 @@ The primary user owns or administers a domain but may have limited DNS experienc
 3. **Make failures diagnostic.** Distinguish a missing record, mismatched value, and temporary DNS failure.
 4. **Never make propagation look like user error.** Explain that DNS changes can take time and make retries safe.
 5. **Keep infrastructure details private.** Show actionable messages to users, discard classified resolver details, and correlate unexpected server failures with a request ID.
-6. **Make verification authoritative on the backend.** The browser may request and display a check, but it cannot decide that a domain is verified.
+6. **Make verification authoritative on the backend.** The browser may request and display a check, but it cannot decide that a domain is verified, and it holds no credential that can change a claim.
 
 ## Assumptions
 
@@ -55,7 +55,7 @@ The primary user owns or administers a domain but may have limited DNS experienc
 - **There is a durable user identity (Clerk).** A claim is an account association (user/domain), not a browser session.
 - **A domain is exclusive to one verified account at a time**, enforced atomically in the database.
 - **The exact entered name is proven, never the parent.** A claim for `mail.example.com` does not verify `example.com` or any sibling.
-- **A newer proof of DNS control moves the domain.** The previous holder is superseded, not blocked, and can win it back with a fresh proof. The takeover is disclosed to the new holder after the fact; a pending claimant is never told the domain is already held. Two people with valid DNS access can therefore move it back and forth; that is an accepted coordination gap.
+- **A newer proof of DNS control moves the domain.** The previous holder is superseded, not blocked, and can win it back with a fresh proof. Nothing is disclosed before a valid proof; after a takeover, the new holder sees a transfer note for ten minutes, never the previous holder's identity. The previous holder's superseded explanation remains available. This is the shape of Resend's own Domain Claim feature; Clerk instead routes every dispute through support.
 - **Verification is point-in-time.** Nothing re-checks a verified domain in the background. After success, the TXT record may be removed; the association remains until the user deletes it or a newer proof supersedes it.
 - **Every recheck window starts with a click.** After a "wait for DNS" answer, the page rechecks itself for a bounded window while it stays open; there is no server-side polling or queue.
 - **Claim creation and verification are two separate steps in a strict order.** Adding a domain persists the claim and issues a token but never triggers a lookup.
@@ -77,7 +77,7 @@ Supporting reasoning lives in [README § Tradeoffs and limitations](../README.md
 ### P1 — recovery and polish
 
 - Recheck on the page for a bounded window after a user-initiated check, as a tradeoff for DNS propagation. Queued or any other long-lasting check is out of scope.
-- Correct unfinished claims and remove existing claims
+- Correct unfinished claims and delete existing claims. A domain can be edited only while it has never verified, to fix a typo before the record goes live; once it has verified at any point, its history belongs to that domain, so the user removes it and adds the corrected one
 - Provide polished setup documentation and a short demo
 
 ### Out of scope
@@ -85,8 +85,9 @@ Supporting reasoning lives in [README § Tradeoffs and limitations](../README.md
 - Email-specific DNS configuration or email delivery, including SPF, DKIM, DMARC, MX, and CNAME records
 - Editing DNS, direct DNS-provider integrations, or provider-specific setup instructions
 - Legal ownership, domain registration, renewal, or registrar transfers
-- Organization administration and automated dispute resolution
-- Durable verification after the user leaves through queues, scheduled jobs, or background workers; continuous revalidation, notifications, and grace periods
+- Organization administration
+- Durable verification after the user leaves through queues, scheduled jobs, or background workers; continuous revalidation, notifications, and a grace period before a lost verification takes effect
+- Transfer cooldowns/grace periods, activity-based takeover blocks, and dispute handling, including support-run transfers
 - Production hardening such as rate limiting, enterprise resolver infrastructure, soft deletion, and durable verification history
 
 ## Core user flow
@@ -95,12 +96,12 @@ An authenticated user claims a domain, receives one DNS instruction, runs a veri
 
 1. **Enter domain** — e.g. `recomendei.me`. No DNS is touched yet.
 2. **Persist the claim.** The backend validates and stores it with a fresh token. State is `setup_required`, meaning only "not checked yet."
-3. **Review DNS instructions** — type, name, full hostname, value, TTL, all copyable.
+3. **Review DNS instructions** — type, name, full hostname, value, and TTL. The full hostname and token are copyable.
 4. **Publish the record** at the DNS provider.
 5. **Click Verify domain.** One DNS lookup runs; nothing looked up before this.
 6. **See the result.** A match verifies; otherwise a specific diagnosis and next action.
 7. **Wait on the page, or come back.** On "not found yet" or "DNS didn't respond," the page rechecks itself for a bounded window with a visible countdown and a stop control. **Check again** always works instead. Closing the tab ends it; a later visit shows the last result.
-8. **Recover if needed.** Replacing the token is a separate, deliberate action that warns the old value stops working.
+8. **Recover if needed.** Replacing the token is a separate, deliberate action; the previous value stops working.
 
 ## State transitions
 
@@ -110,10 +111,10 @@ The state model is derived from durable facts rather than a stored status. The t
 | --- | --- | --- | --- | --- |
 | — | Create claim | Valid, eligible domain | Store domain, token, and expiry | `setup_required` |
 | Pending | Failed check | Active token | Replace latest check result only | Diagnostic failure state |
-| Pending | Successful check | Active token and exact TXT match | Set `verifiedAt` atomically | `verified` |
+| Pending | Successful check | Active token, exact TXT match | Set `verifiedAt`; supersede any current holder and stamp `tookOverAt`, atomically | `verified` |
 | Pending | Replace challenge | Authorized user | Replace token and expiry; clear latest check | `setup_required` |
 | Pending | Seven days pass | — | No write; state is derived from expiry | `expired` |
-| Verified | Newer proof by another account | Valid competing proof | Set `supersededAt`; expire old token | `superseded` |
+| Verified | Newer proof by another account | Valid competing proof | Set `supersededAt`; clear `tookOverAt`; expire old token | `superseded` |
 | Superseded | Replace challenge | Authorized previous holder | Issue a fresh token and expiry | `setup_required` with prior loss noted |
 | Any state | Delete claim | Authorized user | Hard-delete the claim | Removed; domain released if verified |
 
@@ -122,7 +123,9 @@ The state model is derived from durable facts rather than a stored status. The t
 - Generate challenges only on the backend, from a cryptographically secure source.
 - Authorize every read, retry, replacement, and release action against the owning account.
 - Treat DNS observations as untrusted input; bound stored and displayed values.
+- Disclose nothing about other accounts' claims before a valid proof; after a takeover, say that the domain moved, never who held it.
 - Never disclose the identity of an account currently or previously associated with a domain.
+- Change claims only from the backend. The browser's session can read its own rows and nothing else.
 - Never claim that DNS control establishes legal ownership.
 
 Enforcement is defined under [authorization](domain-verification-technical-spec.md#authorization) and [observability and privacy](domain-verification-technical-spec.md#observability-and-privacy) in the technical specification.

@@ -4,7 +4,7 @@
 
 **Status:** Complete, open to iteration
 **Date:** September 5, 2026
-**Related documents:** [Product brief](domain-verification-product-brief.md) · [Challenge description](challenge-description.md)
+**Related documents:** [Product brief](domain-verification-product-brief.md) · [Challenge description](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153)
 
 This document is the engineering counterpart to the product brief. The brief owns the user problem, principles, priorities, scope, and product decisions. This document owns architecture, API contracts, state modeling, persistence, and security. Where the two overlap, this document is authoritative on mechanism and the brief is authoritative on intent.
 

@@ -5,7 +5,7 @@
 **Status:** Complete, open to iteration
 **Date:** September 5, 2026
 **Delivery window:** One week
-**Related documents:** [README](../README.md) · [Technical specification](domain-verification-technical-spec.md) · [Challenge description](challenge-description.md)
+**Related documents:** [README](../README.md) · [Technical specification](domain-verification-technical-spec.md) · [Challenge description](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153)
 
 This document states the user problem, principles, and decisions — the *why* and the *what*, kept terse. Mechanism lives in the [technical specification](domain-verification-technical-spec.md). Tradeoff reasoning already written up for a reader lives in the [README](../README.md#tradeoffs-and-limitations) and is not repeated here.
 

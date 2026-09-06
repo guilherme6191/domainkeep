@@ -83,6 +83,8 @@ Nothing about another account's claim is disclosed before a valid proof; otherwi
 
 `supersededAt` records that the caller's own claim lost the association. `tookOverAt` records that the caller's proof ended another account's association, and when. The transfer transaction writes it on the winning row in the same statement that supersedes the loser: the transaction time if a holder was displaced, otherwise null. The same transaction clears it on the loser's row, so a claim carries at most one of the two facts: `tookOverAt` means this claim displaced someone and still holds the domain, `supersededAt` means someone displaced this claim. The database enforces that they are never both set.
 
+Every pending claim carries the same unconditional line beside its verify action: verifying takes the domain over if another account currently holds it, which is the intended path for a purchase or an account migration, and otherwise a reason to check with whoever manages the domain first. It is deliberately not conditional on the domain actually being held — showing it only for held domains would answer "is this domain taken?" for anyone who typed one in, which is the disclosure this section exists to withhold. Unconditional, it reveals nothing, and it is true of every claim.
+
 Resend's own Domain Claim discloses the conflict before proof, because its claim flow uses different records from its ordinary add flow and the user has to be routed. Here both paths are the same instruction, so a pending claimant loses nothing by not knowing.
 
 ### Routes
@@ -334,6 +336,22 @@ WHERE verified_at IS NOT NULL
 The `WHERE` clause excludes pending and superseded rows. Among the remaining active rows, each normalized domain may appear only once. If concurrent requests would break that rule, Postgres rejects one transaction. The losing route reloads the authoritative claim and returns it as an ordinary `200` — the claim is genuinely still pending, and looks like any other pending claim. No new error code is introduced, and the raw database error is never exposed.
 
 The transaction performs the transfer; the unique index is the final safety net. An advisory lock is not required for the MVP. A later check performs a new DNS lookup and may transfer the domain again if its active token matches.
+
+### Notifying the displaced holder
+
+Losing a domain is the most consequential event in the product, and the list alone only reaches someone who happens to open the app. When a transfer displaces a holder, that account gets one email through Resend.
+
+**Trigger.** The route already returns early for a claim that was verified when the request began, so reaching `verify_domain_claim` means this request was a candidate to perform the takeover. A returned row with `tookOverAt` set means it did.
+
+**Finding the displaced row.** The transfer stamps the loser's `supersededAt` and the winner's `tookOverAt` with the same `now()` inside one transaction, so the displaced row is the one carrying the winner's `normalizedDomain`, a different id, and `supersededAt` at that instant. The unique index guarantees at most one. The lookup uses a one-millisecond window rather than an equality because Postgres keeps microseconds and JavaScript `Date` truncates them; the upper bound matters, since a later takeover of the same domain would satisfy an open-ended comparison. Nothing about `verify_domain_claim` changes, and its return type stays as it is.
+
+**At most once per takeover, enforced by the database.** `domain_claims` gains a nullable `takeover_notified_at`. Claiming the notice is a single conditional update — set the column where the row matches the predicate above *and* `takeover_notified_at` is either null or earlier than this takeover's instant, returning the id and owner. The comparison is against the instant rather than a plain null check because a claim can be lost, won back, and lost again: a row that was notified about an earlier takeover must still be notified about this one. A notice already claimed for the *current* takeover was stamped after it and so fails the comparison, which is what stops a duplicate. Zero rows means another request already claimed it, or there was no displaced holder; nothing is sent. Marking precedes sending, and a failure after marking is logged and not retried: for a notice the list also carries, one missed email is a better trade than a duplicate on the double-click path.
+
+**Off the response path.** The whole step runs inside Next's `after()`, so it cannot add latency to the new holder's request, and every error inside is caught and logged against the claim id. A send failure never changes the verification result. When `RESEND_API_KEY` or `RESEND_FROM` is unset the mailer is a no-op, which keeps local development free of mail configuration.
+
+**Privacy.** The recipient address is read from Clerk by user id at send time and never stored on the claim, so it cannot go stale. It appears in the success log line, which is what makes a delivery question answerable after the fact; nothing else about either account does. The message names the domain, the time, and a link to the recipient's own claim; it never carries the new holder's identity, account id, or any request id. The reverse holds too: the new holder learns nothing about who was displaced.
+
+**Link base.** The absolute base comes from `NEXT_PUBLIC_APP_URL`, then `VERCEL_PROJECT_PRODUCTION_URL`, and only then the request's origin. Configuration comes first deliberately: the request that triggers the email belongs to the new holder, so trusting its origin would let them aim the previous holder's "recover your domain" link at a host they control.
 
 ### Token expiry
 

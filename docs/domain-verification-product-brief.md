@@ -11,7 +11,7 @@ This document states the user problem, principles, and decisions — the *why* a
 
 ## Summary
 
-Build a deployed, accessible product experience that allows a user to claim a domain and prove that they control its DNS. The core proof will use a unique TXT challenge published at a dedicated DNS name. The product will make the technical setup understandable, distinguish propagation from configuration mistakes, and give users a clear recovery path when verification fails.
+Build a deployed, accessible product experience that allows a user to claim a domain and prove that they control its DNS. The core proof will use a unique TXT challenge published at the claimed name itself, carrying a self-identifying value prefix so it coexists with the records already there. The product will make the technical setup understandable, distinguish propagation from configuration mistakes, and give users a clear recovery path when verification fails.
 
 The experience proves control of DNS at the time of verification. It does not establish legal ownership of a domain.
 
@@ -33,10 +33,16 @@ The primary user owns or administers a domain but may have limited DNS experienc
 
 > When I need to connect my domain to a service, help me prove that I control it, understand exactly what to change, and recover from mistakes without putting my existing DNS configuration at risk.
 
+The second job is claim resolution. Resend uses *claim* for taking over a domain that another account has already verified — a former agency, a contractor, or a colleague's old account still holds it. This product serves that job with the same DNS proof: whoever can publish the challenge now takes the domain, and the previous holder is told, so no dispute needs a support ticket.
+
+> When my domain is already verified under someone else's account, let me prove control and take it over myself, and tell the other account what happened.
+
+In this document and the code, *claim* names every domain a user adds, whatever its state; the takeover is the real *claiming* case of it.
+
 ## Product principles
 
 1. **Say what is actually proven.** Use "control" in explanatory copy rather than implying legal ownership.
-2. **Give users one safe change to make.** Keep the required DNS record isolated from existing root records.
+2. **Give users one safe change to make.** One TXT record with a self-identifying value, added beside whatever the name already carries, never replacing it.
 3. **Make failures diagnostic.** Distinguish a missing record, mismatched value, and temporary DNS failure.
 4. **Never make propagation look like user error.** Explain that DNS changes can take time and make retries safe.
 5. **Keep infrastructure details private.** Show actionable messages to users, discard classified resolver details, and correlate unexpected server failures with a request ID.
@@ -55,9 +61,9 @@ The primary user owns or administers a domain but may have limited DNS experienc
 - **There is a durable user identity (Clerk).** A claim is an account association (user/domain), not a browser session.
 - **A domain is exclusive to one verified account at a time**, enforced atomically in the database.
 - **The exact entered name is proven, never the parent.** A claim for `mail.example.com` does not verify `example.com` or any sibling.
-- **A newer proof of DNS control moves the domain.** The previous holder is superseded, not blocked, and can win it back with a fresh proof. Nothing is disclosed before a valid proof; after a takeover, the new holder sees a transfer note for ten minutes, never the previous holder's identity. The previous holder's superseded explanation remains available. This is the shape of Resend's own Domain Claim feature; Clerk instead routes every dispute through support.
+- **A newer proof of DNS control moves the domain.** The previous holder is superseded, not blocked, and can win it back with a fresh proof. Nothing is disclosed before a valid proof; after a takeover, the new holder sees a transfer note for ten minutes, never the previous holder's identity. The previous holder is told twice: by email through Resend when the takeover happens, and by the superseded claim that stays in their list. Neither names the new holder. This is the shape of Resend's own Domain Claim feature; Clerk instead routes every dispute through support.
 - **Verification is point-in-time.** Nothing re-checks a verified domain in the background. After success, the TXT record may be removed; the association remains until the user deletes it or a newer proof supersedes it.
-- **Every recheck window starts with a click.** After a "wait for DNS" answer, the page rechecks itself for a bounded window while it stays open; there is no server-side polling or queue.
+- **Every check starts with a click.** There is no polling on the page or the server. After a "wait for DNS" answer the copy says DNS can take time, and the user checks again when ready.
 - **Claim creation and verification are two separate steps in a strict order.** Adding a domain persists the claim and issues a token but never triggers a lookup.
 
 Supporting reasoning lives in [README § Tradeoffs and limitations](../README.md#tradeoffs-and-limitations).
@@ -76,8 +82,8 @@ Supporting reasoning lives in [README § Tradeoffs and limitations](../README.md
 
 ### P1 — recovery and polish
 
-- Recheck on the page for a bounded window after a user-initiated check, as a tradeoff for DNS propagation. Queued or any other long-lasting check is out of scope.
 - Correct unfinished claims and delete existing claims. A domain can be edited only while it has never verified, to fix a typo before the record goes live; once it has verified at any point, its history belongs to that domain, so the user removes it and adds the corrected one
+- Email the previous holder through Resend when their domain is taken over, so losing a domain is never discovered by accident. Sent at most once per takeover, without the new holder's identity; when no Resend key is configured, nothing is sent and the list remains the signal
 - Provide polished setup documentation and a short demo
 
 ### Out of scope
@@ -86,21 +92,21 @@ Supporting reasoning lives in [README § Tradeoffs and limitations](../README.md
 - Editing DNS, direct DNS-provider integrations, or provider-specific setup instructions
 - Legal ownership, domain registration, renewal, or registrar transfers
 - Organization administration
-- Durable verification after the user leaves through queues, scheduled jobs, or background workers; continuous revalidation, notifications, and a grace period before a lost verification takes effect
+- Durable verification after the user leaves through queues, scheduled jobs, or background workers; continuous revalidation, success notifications, and a grace period before a lost verification takes effect
 - Transfer cooldowns/grace periods, activity-based takeover blocks, and dispute handling, including support-run transfers
 - Production hardening such as rate limiting, enterprise resolver infrastructure, soft deletion, and durable verification history
 
 ## Core user flow
 
-An authenticated user claims a domain, receives one DNS instruction, runs a verification check, gets a specific diagnosis, and can correct or retry until the domain becomes persistently associated with their account. Mechanism for each step is in the [technical specification](domain-verification-technical-spec.md); the on-page recheck tradeoff is in the [README](../README.md#tradeoffs-and-limitations).
+An authenticated user claims a domain, receives one DNS instruction, runs a verification check, gets a specific diagnosis, and can correct or retry until the domain becomes persistently associated with their account. Mechanism for each step is in the [technical specification](domain-verification-technical-spec.md).
 
 1. **Enter domain** — e.g. `recomendei.me`. No DNS is touched yet.
 2. **Persist the claim.** The backend validates and stores it with a fresh token. State is `setup_required`, meaning only "not checked yet."
-3. **Review DNS instructions** — type, name, full hostname, value, and TTL. The full hostname and token are copyable.
+3. **Review DNS instructions** — type, name (`@`), full hostname, value, and TTL. The full hostname and value are copyable.
 4. **Publish the record** at the DNS provider.
 5. **Click Verify domain.** One DNS lookup runs; nothing looked up before this.
 6. **See the result.** A match verifies; otherwise a specific diagnosis and next action.
-7. **Wait on the page, or come back.** On "not found yet" or "DNS didn't respond," the page rechecks itself for a bounded window with a visible countdown and a stop control. **Check again** always works instead. Closing the tab ends it; a later visit shows the last result.
+7. **Come back or check again.** On "not found yet" or "DNS didn't respond," the page explains that DNS can take time and that the code stays valid. **Check again** runs one more lookup; a later visit shows the last result.
 8. **Recover if needed.** Replacing the token is a separate, deliberate action; the previous value stops working.
 
 ## State transitions
@@ -117,6 +123,17 @@ The state model is derived from durable facts rather than a stored status. The t
 | Verified | Newer proof by another account | Valid competing proof | Set `supersededAt`; clear `tookOverAt`; expire old token | `superseded` |
 | Superseded | Replace challenge | Authorized previous holder | Issue a fresh token and expiry | `setup_required` with prior loss noted |
 | Any state | Delete claim | Authorized user | Hard-delete the claim | Removed; domain released if verified |
+
+The domains list does not show these seven states. It shows four labels grouped by what the user does next; the detail page names the exact state.
+
+| Label | States | What the user does |
+| --- | --- | --- |
+| Verified | `verified` | Nothing |
+| Unchecked | `setup_required` | Publish the record and run the first check |
+| Needs attention | `record_not_found`, `value_mismatch`, `temporary_dns_error`, `expired` | Open the domain; the detail page names the fix |
+| Superseded | `superseded` | Open the domain; another account took it |
+
+The third label is "Needs attention" rather than "Failed" because the most common reason is a record that has not propagated yet, and principle 4 forbids making that look like a mistake. Superseded stays its own label because it is the previous holder's in-app signal; the takeover email points back to it.
 
 ## Trust and safety principles
 

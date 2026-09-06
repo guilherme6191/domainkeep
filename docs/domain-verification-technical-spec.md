@@ -54,8 +54,9 @@ Every route that returns a claim returns the same `ClaimView`. It is a deliberat
 interface ClaimView {
   id: string;
   domain: string;                  // normalized, ASCII
-  verificationHostname: string;    // _resend-verify.<domain>, precomputed
+  verificationHostname: string;    // the claimed domain itself, precomputed
   token: string;
+  recordValue: string;             // resend-verify=<token>, composed server-side
   tokenExpiresAt: string;          // ISO 8601
   verifiedAt: string | null;
   supersededAt: string | null;
@@ -106,13 +107,7 @@ A missing record, a mismatched value, and a resolver timeout are all **successfu
 
 This keeps a large ambiguity out of the client: it never has to decide whether a non-2xx means "your DNS is wrong" or "our server is broken." An expired token is also `200` — the request is rejected before any DNS lookup, and the returned view simply carries `state: "expired"`, which is the state the UI already knows how to render.
 
-`POST /api/claims/:id/verify` is the only route that performs a DNS lookup, and it performs exactly one per request. There is no polling endpoint, no background job, and no scheduled revalidation.
-
-### On-page rechecks
-
-When a user-initiated check returns `record_not_found` or `temporary_dns_error`, the client opens a ten-minute recheck window anchored on that click. It calls the same verify route every ten seconds while the tab is visible; any other result or an explicit stop ends the window. **Check again** remains available and may start a fresh window.
-
-The deadline is stored in `sessionStorage` by claim, so it survives reloads in the same tab but is not a background process. The server cannot distinguish rechecks from clicks and stores no scheduling state. `RECHECK_INTERVAL_MS` and `RECHECK_WINDOW_MS` are the only configuration.
+`POST /api/claims/:id/verify` is the only route that performs a DNS lookup, and it performs exactly one per request. There is no polling endpoint, no background job, and no scheduled revalidation. The client does not poll either: a lookup happens only when the user clicks **Verify domain** or **Check again**, and the copy explains that DNS can take time rather than treating a missing record as an error.
 
 ### Errors
 
@@ -151,15 +146,19 @@ For `recomendei.me`, the product instructs the user to publish:
 
 ```text
 Type:  TXT
-Name:  _resend-verify
-FQDN:  _resend-verify.recomendei.me
-Value: <64-character lowercase hexadecimal token>
+Name:  @
+FQDN:  recomendei.me
+Value: resend-verify=<64-character lowercase hexadecimal token>
 TTL:   Auto or provider default
 ```
 
-The dedicated name avoids unrelated TXT records at the root `@`, which commonly already carries SPF, site-verification, and other values. Because `_resend-verify` already communicates the record's purpose, the value contains only the random token with no `resend-verify=` prefix. The leading underscore signals that the name holds service metadata rather than a host. Resend's own Domain Claim makes the other choice, a prefixed value at the apex, where the prefix is what makes the record findable among the values already there; the cost of a dedicated name is the host field, which some providers auto-append the domain to, and the `record_not_found` guidance accounts for that.
+The record lives at the claimed name itself, with a `resend-verify=` prefix on the value. This is the shape Resend, Google, and Microsoft use, so anyone who has verified a domain for another service recognizes it, and the prefix is what makes the value findable and matchable among the SPF and site-verification values a root commonly already carries. Only prefixed values are considered; a bare token does not verify, which is what keeps SPF out of both the match and the diagnostics. The costs are real: a name that is already a CNAME cannot carry a TXT record at all, and the user is editing the record set that holds SPF, so the copy tells them to add beside, never replace.
 
-The resolver always appends `_resend-verify` to the exact normalized domain being claimed, with no fallback to the parent. A claim for `news.recomendei.me` therefore queries `_resend-verify.news.recomendei.me`. The full hostname is canonical and is always shown alongside the record name, so the user can confirm what their provider produced.
+The name field shows `@` for every claim, root or subdomain. `@` is not a name but the near-universal provider shorthand for the apex of the zone being edited, and the product cannot know where the zone cut falls: a Public Suffix List gives the registrable boundary, not the zone boundary, and nothing in a TXT lookup reveals it. Rather than guess a relative label, the UI shows `@` and states the one unambiguous fact beside it — the record's full name has to end up as the claimed domain. Someone claiming `promo.acme.com` from inside the `acme.com` zone therefore enters `promo`, and someone administering `promo.acme.com` as a delegated zone enters `@`; the note is what tells them which they are.
+
+The alternative was `@` for a root and a computed relative label for a subdomain. It is right more often for the majority case, but it is still a guess about the zone cut, it needs a Public Suffix List the product does not otherwise carry, and it produces `promo.promo.acme.com` for the delegated administrator. Showing `@` everywhere assumes some working knowledge of DNS zones instead. That is an assumption worth making here: the person editing a zone file to prove domain control is not a first-time computer user, and the `record_not_found` checklist names this specific mistake.
+
+The resolver queries that exact normalized domain, with no fallback to the parent: a claim for `news.recomendei.me` queries `news.recomendei.me`. The value the user must publish is composed on the server and returned as `recordValue`; the browser never assembles it.
 
 ### Token generation
 
@@ -239,6 +238,8 @@ Before creating a challenge, the backend:
 3. Rejects schemes, paths, queries, fragments, ports, IP addresses, local names such as `localhost`, malformed labels, and a pragmatic set of common public suffixes that cannot be privately controlled. This set is deliberately limited rather than a complete implementation of the Public Suffix List. When a URL prefix is present, return: "Please enter the domain without the URL prefix (e.g., example.com instead of https://example.com)."
 4. Preserves the exact registrable domain or subdomain the user intends to claim.
 
+Exact-name verification is what makes delegated subdomains safe. Corporate IT can run `acme.com` on Route 53 and delegate `promo.acme.com` to an agency's Cloudflare zone with an NS record; the agency can then add records there and IT cannot without pulling the delegation back. The product never needs to know the delegation exists: the DNS tree decides who answers at `promo.acme.com`, and a parent can always reclaim a subdomain by changing the tree, which is the ordinary takeover path.
+
 Normalization is implemented **once** in shared TypeScript rather than independently in the browser and backend. The frontend may provide early feedback, but the backend performs authoritative validation using the same module.
 
 If the user corrects a misspelled domain, `PATCH` **edits the existing row in place**: it writes the new normalized domain, issues a fresh token and expiry, and clears `lastCheck`. The claim keeps its id, so the page the user is on stays the page they are on, and a typo does not leave an abandoned row behind in their domain list.
@@ -247,16 +248,18 @@ Editing is refused with `claim_locked` when the claim is verified or superseded.
 
 ### DNS lookup and matching
 
-The backend queries TXT records at `_resend-verify.<normalized-domain>` through the DNS adapter. It never interpolates user input into a shell command such as `dig`.
+The backend queries TXT records at the exact `<normalized-domain>` through the DNS adapter. It never interpolates user input into a shell command such as `dig`.
 
 A TXT lookup can return multiple records, and a single record can be divided into 255-byte chunks. Reconstruct each record independently, then look for an exact match:
 
 ```ts
-const observedValues = records.map((chunks) => chunks.join(""));
-const matched = observedValues.includes(expectedToken);
+const observedValues = records
+  .map((chunks) => chunks.join(""))
+  .filter((value) => value.startsWith("resend-verify="));
+const matched = observedValues.includes(`resend-verify=${expectedToken}`);
 ```
 
-Verification succeeds when **any** reconstructed record exactly matches the active challenge. Additional values are tolerated but do not contribute to verification. This tolerates provider behavior, propagation overlap, and deliberate token replacement without weakening exact-match verification. If the verification hostname already has a TXT value, the user may replace it or add the active token as another value when their provider supports multiple values. The UI may recommend removing obsolete `_resend-verify` values, but cleanup is never required for a successful active challenge.
+Verification succeeds when **any** reconstructed record exactly matches the active challenge value. Additional values are tolerated but do not contribute to verification. This tolerates provider behavior, propagation overlap, and deliberate token replacement without weakening exact-match verification. The prefix filter runs first and does double duty: a name carrying only SPF and other verifiers reads as `record_not_found` rather than a mismatch, and the values reported back to the user contain nothing but this product's own, so an SPF record is never echoed into the UI or the stored `observedValues`. Since the record shares a name with whatever else lives there, the user adds the value beside the existing ones rather than replacing them. The UI may recommend removing obsolete `resend-verify=` values, but cleanup is never required for a successful active challenge.
 
 Quotes printed by command-line tools such as `dig` are presentation syntax and are not part of the value a DNS library returns.
 
@@ -286,6 +289,8 @@ function getClaimViewState(claim: DomainClaim, now: Date): ClaimViewState {
 `superseded` outranks `expired` because reassignment sets `supersededAt` and expires the old token at the same instant. It is transitional: replacing that token returns the claim to the ordinary pending states while retaining `supersededAt` as historical context; only a successful re-proof clears it.
 
 `setup_required` means only that the current challenge has not been checked and must not render as an error. `checking` is transient frontend request state and is never persisted.
+
+**List presentation.** The status badge maps the seven states to four labels: `verified` → Verified, `setup_required` → Unchecked, `record_not_found` / `value_mismatch` / `temporary_dns_error` / `expired` → Needs attention, `superseded` → Superseded. The mapping is presentation only, lives in one component, and never feeds back into state derivation; the same badge appears on the detail page beside the panel that names the exact state. The four diagnostic states share one neutral label, not a red "Failed", because a missing record is usually propagation. `superseded` keeps a distinct label because the list is the previous holder's in-app notification of a takeover; the takeover email links to the claim.
 
 Verification success is represented by `verifiedAt` together with a null `supersededAt`; it takes precedence over token expiry and does not depend on the TXT record remaining in DNS. A successful verification clears `lastCheck`. No attempt counter or attempt history is persisted.
 
@@ -345,8 +350,8 @@ Every outcome maps to one user decision. Messages are product surface, not debug
 | Outcome | Condition | User guidance and recovery |
 | --- | --- | --- |
 | Invalid input | The submitted value is not eligible | Explain the specific problem; issue no challenge |
-| `record_not_found` | No hostname or TXT record is visible | Check the name, account for provider auto-appending, wait, and retry with the same token; never assert misconfiguration |
-| `value_mismatch` | TXT records exist but none exactly matches | Show bounded expected and observed values, correct DNS, and retry with the same token |
+| `record_not_found` | No `resend-verify=` value is visible at the name, whatever else is | Check the value carries the prefix, check `@` resolved to the intended zone rather than a parent, check the name is not a CNAME, wait, and retry with the same token; never assert misconfiguration |
+| `value_mismatch` | `resend-verify=` values exist but none exactly matches | Show bounded expected and observed values, prefixed values only, correct DNS, and retry with the same token |
 | `temporary_dns_error` | The resolver times out, refuses, or temporarily fails | Say the record may be correct and retry without changing DNS |
 | `expired` | Seven days elapsed on a pending challenge | Deliberately generate a replacement and explain that the old value is invalid |
 | Existing association | Another account currently holds the domain | Disclose nothing before proof; proceed like an unheld claim |
@@ -354,7 +359,7 @@ Every outcome maps to one user decision. Messages are product surface, not debug
 | `superseded` | Another account later proved control | Show when it moved and offer a fresh challenge; never identify the winner |
 | Unexpected failure | An outcome cannot be classified | Show the generic API message and request ID; preserve the claim and token for retry |
 
-Starting or failing a competing claim never affects the current association. A successful takeover leaves other pending claims untouched. The previous holder learns of the change on its next visit; notifications are out of scope.
+Starting or failing a competing claim never affects the current association. A successful takeover leaves other pending claims untouched. The previous holder is emailed once, after the response, and finds the superseded claim in the list on the next visit.
 
 ### Authorization
 

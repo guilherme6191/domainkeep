@@ -1,0 +1,64 @@
+"use client";
+
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useDeleteClaim } from "@/hooks/use-claims";
+
+export function DeleteDomainDialog({
+  claimId,
+  domain,
+  isVerified,
+  trigger,
+  onDeleted,
+}: {
+  claimId: string;
+  domain: string;
+  isVerified: boolean;
+  trigger: React.ReactElement;
+  onDeleted?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const deleteClaim = useDeleteClaim({
+    onSuccess: () => {
+      setOpen(false);
+      onDeleted?.();
+    },
+  });
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger render={trigger} />
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {domain}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {isVerified
+              ? `${domain} will stop being associated with your account, and anyone who controls its DNS can verify it instead. You can add it again, but you'll have to prove control from scratch.`
+              : `This deletes the claim and its verification code. You can add ${domain} again later, but you'll get a new code.`}{" "}
+            The TXT record stays in your DNS until you remove it there — it does
+            nothing once this claim is gone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={deleteClaim.isPending}
+            onClick={() => deleteClaim.mutate(claimId)}
+          >
+            {deleteClaim.isPending ? "Deleting…" : "Delete domain"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

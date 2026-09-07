@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertCircle, AlertTriangle, CircleCheck } from "lucide-react";
 import { CopyButton } from "@/components/domains/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -197,34 +197,16 @@ function Expired() {
   );
 }
 
+// Decided once, when the component mounts: a page left open keeps the note, a
+// load after ten minutes drops it. No timer, nothing to clean up.
 function RecentTakeoverNotice({ tookOverAt }: { tookOverAt: string }) {
-  const [visible, setVisible] = useState(
+  const [visible] = useState(
     () => takeoverNoticeRemainingMs(tookOverAt, Date.now()) > 0,
   );
-
-  useEffect(() => {
-    if (!visible) return;
-
-    const timer = window.setTimeout(
-      () => setVisible(false),
-      takeoverNoticeRemainingMs(tookOverAt, Date.now()),
-    );
-    // A background tab may suspend timers; re-evaluate when the user returns.
-    const onVisibilityChange = () => {
-      if (takeoverNoticeRemainingMs(tookOverAt, Date.now()) === 0) {
-        setVisible(false);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [tookOverAt, visible]);
-
-  return visible ? (
+  if (!visible) return null;
+  return (
     <p>Your DNS proof transferred this domain from another account to yours.</p>
-  ) : null;
+  );
 }
 
 function Verified({ claim }: { claim: ClaimView }) {

@@ -59,7 +59,7 @@ The projection omits `ownerId`, serializes dates, and derives `state` on the ser
 
 ### Takeover disclosure
 
-The verified view shows the new holder's takeover note only during the ten minutes after `tookOverAt`. A client timer hides it while the page remains open, and a return visit uses the original timestamp rather than restarting the window. This is presentation only: it changes neither the stored timestamp nor transfer eligibility. The previous holder's superseded explanation does not expire on this timer.
+The verified view shows the new holder's takeover note only during the ten minutes after `tookOverAt`. The window is decided once when the view mounts: a page left open keeps the note, and a later load uses the original timestamp rather than restarting the window. This is presentation only: it changes neither the stored timestamp nor transfer eligibility. The previous holder's superseded explanation does not expire on this timer.
 
 A domain held elsewhere produces the same creation response and DNS diagnoses as an unheld domain. Every active pending claim has the same warning beside its verify action: verification transfers any existing association, so check with whoever manages the domain first. Conditional warnings would disclose associations before proof. After proof, explain the transfer without identifying either account.
 

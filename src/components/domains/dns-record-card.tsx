@@ -1,4 +1,6 @@
+import { Info } from "lucide-react";
 import { CopyButton } from "@/components/domains/copy-button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -7,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 const COLUMNS = "sm:grid-cols-[5rem_4rem_1fr_4rem]";
@@ -29,6 +32,36 @@ function Cell({
   );
 }
 
+// The `@` explanation lives where the question comes up, not under the table.
+function NameHelp({ hostname }: { hostname: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground size-6 shrink-0"
+            aria-label="What does @ mean?"
+          />
+        }
+      >
+        <Info className="size-3.5" />
+      </PopoverTrigger>
+      <PopoverContent className="font-sans">
+        <p>
+          <span className="text-foreground font-mono">@</span> is the root of
+          the zone you&rsquo;re editing. If you&rsquo;re editing a parent zone,
+          enter the part before it instead, so the record&rsquo;s full name ends
+          up as{" "}
+          <span className="text-foreground font-mono break-words">{hostname}</span>
+          .
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /**
  * `inactive` is the expired case: shown for reference, dimmed, not copyable.
  * The footer stays live because that is where the way out lives.
@@ -37,7 +70,7 @@ export function DnsRecordCard({
   value,
   hostname,
   title = "Add this DNS record",
-  description = "Add the following record at your DNS provider.",
+  description,
   note,
   inactive = false,
   footer,
@@ -54,7 +87,7 @@ export function DnsRecordCard({
     <Card>
       <CardHeader className={cn(inactive && "opacity-40")}>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
 
       <CardContent className={cn(inactive && "opacity-40")}>
@@ -79,7 +112,10 @@ export function DnsRecordCard({
               <span className="flex items-center gap-1">
                 <span className={cn(inactive && "line-through")}>@</span>
                 {inactive ? null : (
-                  <CopyButton value="@" label="name" className="size-6 shrink-0" />
+                  <>
+                    <CopyButton value="@" label="name" className="size-6 shrink-0" />
+                    <NameHelp hostname={hostname} />
+                  </>
                 )}
               </span>
             </Cell>
@@ -107,21 +143,16 @@ export function DnsRecordCard({
         <div className="text-muted-foreground pt-3.5 text-sm">
           {note ?? (
             <p>
-              <span className="text-foreground font-mono">@</span> is the root
-              of the zone you&rsquo;re editing — the record&rsquo;s full name
-              needs to end up as{" "}
-              <span className="inline-flex items-center gap-1 align-middle">
-                <span className="text-foreground font-mono">{hostname}</span>
-                {inactive ? null : (
-                  <CopyButton
-                    value={hostname}
-                    label="full name"
-                    className="size-6 shrink-0"
-                  />
-                )}
-              </span>
-              . If TXT values already exist there, such as SPF, add this one
-              alongside them — don&rsquo;t replace them.
+              The record&rsquo;s full name must be{" "}
+              <span className="text-foreground font-mono">{hostname}</span>
+              {inactive ? null : (
+                <CopyButton
+                  value={hostname}
+                  label="full name"
+                  className="ml-1 -mr-1 size-6 align-middle"
+                />
+              )}
+              . Add it alongside any TXT values already there, such as SPF.
             </p>
           )}
         </div>

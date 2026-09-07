@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, AlertTriangle, CircleCheck } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronRight,
+  CircleCheck,
+} from "lucide-react";
 import { CopyButton } from "@/components/domains/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -22,66 +27,54 @@ function Mono({ children }: { children: React.ReactNode }) {
   );
 }
 
+// The first miss is usually propagation, so the checklist stays folded until
+// the user wants it.
 function RecordNotFound({ claim }: { claim: ClaimView }) {
   return (
     <Alert>
       <AlertCircle />
       <AlertTitle>We couldn&rsquo;t find the verification record yet.</AlertTitle>
-      <AlertDescription className="space-y-4">
+      <AlertDescription className="space-y-3">
         <p>
-          It may not have propagated yet, or it may be published at a different
-          name. DNS changes can take anywhere from a few minutes to a few hours.
+          DNS changes can take a few minutes, occasionally hours. Check again
+          shortly — your code stays valid between checks.
         </p>
 
-        <div className="space-y-2">
-          <p className="text-foreground font-medium">
-            A few things worth checking
-          </p>
-          <ul className="list-disc space-y-1.5 pl-4">
+        <details className="group">
+          <summary className="text-foreground flex cursor-pointer list-none items-center gap-1 font-medium [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+            Still missing after a while?
+          </summary>
+          <ul className="list-disc space-y-1.5 pt-2 pl-4">
             <li>
-              The value starts with <Mono>{VERIFICATION_VALUE_PREFIX}</Mono>. A
-              bare token, without the prefix, is not counted.
+              The value starts with <Mono>{VERIFICATION_VALUE_PREFIX}</Mono>; a
+              bare token doesn&rsquo;t count.
+            </li>
+            <li>The value was pasted, not retyped.</li>
+            <li>
+              The full name is exactly <Mono>{claim.domain}</Mono>. In a parent
+              zone, <Mono>@</Mono> publishes at the parent instead.
             </li>
             <li>
-              The value was pasted, not retyped. A single wrong character in 64
-              will fail.
-            </li>
-            <li>
-              The record&rsquo;s full name is exactly <Mono>{claim.domain}</Mono>
-              . <Mono>@</Mono> is the root of whichever zone you&rsquo;re
-              editing, so using it in a parent zone publishes the record at the
-              parent instead.
-            </li>
-            <li>
-              The record type is TXT, not A or CNAME. A name that is already a
-              CNAME cannot carry a TXT record at all — claim the root or a
-              different name instead.
+              The type is TXT. A name that is already a CNAME can&rsquo;t carry
+              one.
             </li>
           </ul>
-        </div>
-
-        <p>
-          If everything above looks right, allow more time for DNS changes and
-          check again in a few minutes. Retrying does not change your code.
-        </p>
+        </details>
       </AlertDescription>
     </Alert>
   );
 }
 
-// Not destructive: the record is there, one value needs swapping.
-function ValueMismatch({ claim }: { claim: ClaimView }) {
+// Not destructive: the record is there, one value needs swapping. The card
+// below shows expected and found, so the alert is the headline only.
+function ValueMismatch() {
   return (
     <Alert>
       <AlertCircle />
       <AlertTitle>
         We found the record, but its value doesn&rsquo;t match.
       </AlertTitle>
-      <AlertDescription>
-        A <Mono>{VERIFICATION_VALUE_PREFIX}</Mono> value exists at{" "}
-        <Mono>{claim.verificationHostname}</Mono>, so the name is right. It
-        doesn&rsquo;t carry the token we generated for this domain.
-      </AlertDescription>
     </Alert>
   );
 }
@@ -158,10 +151,8 @@ export function ExpectedVsFoundCard({
         </div>
 
         <p className="text-muted-foreground text-sm">
-          Correct the <Mono>{VERIFICATION_VALUE_PREFIX}</Mono> value at{" "}
-          <Mono>{claim.verificationHostname}</Mono>, or add the expected one as
-          another TXT value, then check again. Anything else at that name, such
-          as SPF, stays as it is.
+          Replace the found value with the expected one, or add it as another
+          TXT value, then check again.
         </p>
       </CardContent>
 
@@ -217,10 +208,8 @@ function Verified({ claim }: { claim: ClaimView }) {
       <AlertDescription className="space-y-2">
         <p>
           {claim.verifiedAt
-            ? `Verified on ${formatDateTimeSentence(claim.verifiedAt)}. `
-            : null}
-          This confirms DNS control at the time of the check — it doesn&rsquo;t
-          establish legal ownership.
+            ? `Verified on ${formatDateTimeSentence(claim.verifiedAt)}.`
+            : "DNS control confirmed at the time of the check."}
         </p>
         {claim.tookOverAt ? (
           <RecentTakeoverNotice key={claim.tookOverAt} tookOverAt={claim.tookOverAt} />
@@ -239,10 +228,9 @@ function Superseded({ claim }: { claim: ClaimView }) {
         {claim.verifiedAt
           ? `You verified this domain on ${formatDateTimeSentence(claim.verifiedAt)}, and it has since moved. `
           : null}
-        The code you published no longer proves anything. If you still control
-        its DNS, generate a new code and verify again to take it back — but
-        check with your team, or whoever manages this domain, on who should
-        hold the claim. Anyone with DNS access can move it back the other way.
+        If you still control its DNS, generate a new code and verify again to
+        take it back. Check with whoever manages this domain first on who should
+        hold it.
       </AlertDescription>
     </Alert>
   );
@@ -277,7 +265,7 @@ function statePanel(claim: ClaimView) {
     case "record_not_found":
       return <RecordNotFound claim={claim} />;
     case "value_mismatch":
-      return <ValueMismatch claim={claim} />;
+      return <ValueMismatch />;
     case "temporary_dns_error":
       return <TemporaryDnsError />;
     case "expired":

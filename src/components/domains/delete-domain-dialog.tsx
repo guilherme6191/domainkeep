@@ -45,9 +45,7 @@ export function DeleteDomainDialog({
           <AlertDialogDescription>
             {isVerified
               ? `${domain} will stop being associated with your account, and anyone who controls its DNS can verify it instead. You can add it again, but you'll have to prove control from scratch.`
-              : `This deletes the claim and its verification code. You can add ${domain} again later, but you'll get a new code.`}{" "}
-            The TXT record stays in your DNS until you remove it there — it does
-            nothing once this claim is gone.
+              : `This deletes the claim and its verification code. You can add ${domain} again later, but you'll get a new code.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

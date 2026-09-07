@@ -36,27 +36,16 @@ function Meta({ label, iso }: { label: string; iso: string }) {
 }
 
 /**
- * Shown for every pending claim, never only when the domain is held. Making it
- * conditional would answer "is this domain taken?" for anyone who typed it in,
- * which is the disclosure the whole flow is built to withhold until there is
- * proof.
+ * Shown beside every Verify button, never only when the domain is held. Making
+ * it conditional would answer "is this domain taken?" for anyone who typed it
+ * in, which is the disclosure the whole flow is built to withhold until there
+ * is proof.
  */
 function TakeoverNote() {
   return (
-    <p className="text-muted-foreground text-sm">
-      Verifying takes the domain over if another account currently holds it.
-      That&rsquo;s the intended path for a purchase or a migration between
-      accounts — otherwise, check with whoever manages this domain first.
-    </p>
-  );
-}
-
-function PropagationNote({ buttonLabel }: { buttonLabel: string }) {
-  return (
-    <p className="text-muted-foreground text-sm">
-      DNS changes can take a few minutes, occasionally hours, to propagate.
-      Nothing is checked until you click {buttonLabel}, and your code stays
-      valid between checks, so retrying is free.
+    <p className="text-muted-foreground mr-auto max-w-[26rem] text-sm">
+      Verifying transfers the domain if another account holds it. If that
+      isn&rsquo;t expected, check with whoever manages it first.
     </p>
   );
 }
@@ -147,24 +136,20 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   const actions = isVerified ? (
     deleteDomain
   ) : needsNewCode ? (
-    <>
-      <p className="text-muted-foreground mr-auto max-w-[26rem] text-sm">
-        The previous value will stop working. You&rsquo;ll need to update the
-        TXT record at your provider.
-      </p>
-      <Button
-        size="sm"
-        onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
-        disabled={replaceToken.isPending}
-      >
-        {replaceToken.isPending ? "Generating…" : "Generate a new code"}
-      </Button>
-    </>
+    <Button
+      size="sm"
+      onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
+      disabled={replaceToken.isPending}
+    >
+      {replaceToken.isPending ? "Generating…" : "Generate a new code"}
+    </Button>
   ) : (
     <>
+      <TakeoverNote />
       <Button
         variant="ghost"
         size="sm"
+        title="Invalidates the current code. You'll need to update the TXT record."
         onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
         disabled={replaceToken.isPending}
       >
@@ -223,7 +208,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
             ) : null}
             {isVerified ? null : (
               <Meta
-                label={needsNewCode ? "Challenge expired" : "Challenge expires"}
+                label={needsNewCode ? "Code expired" : "Code expires"}
                 iso={claim.tokenExpiresAt}
               />
             )}
@@ -241,32 +226,16 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           hostname={claim.verificationHostname}
           title={isVerified ? "Verification record" : "Add this DNS record"}
           description={
-            isVerified
-              ? "The record we matched during the last check."
-              : "Add the following record at your DNS provider."
+            isVerified ? "The record we matched during the last check." : undefined
           }
           note={
             isVerified ? (
-              <p>
-                You can remove the{" "}
-                <span className="text-foreground font-mono">
-                  resend-verify=
-                </span>{" "}
-                TXT value now if you&rsquo;d like. Leave anything else at that
-                name alone.
-              </p>
+              <p>You can remove this TXT value now if you&rsquo;d like.</p>
             ) : undefined
           }
           inactive={needsNewCode}
           footer={actions}
         />
-      )}
-
-      {isVerified || needsNewCode ? null : (
-        <div className="space-y-2">
-          <PropagationNote buttonLabel={verifyLabel} />
-          <TakeoverNote />
-        </div>
       )}
     </div>
   );

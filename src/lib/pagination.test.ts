@@ -20,6 +20,7 @@ describe("parsePage", () => {
 describe("parsePageSize", () => {
   it("accepts only the offered sizes", () => {
     expect([parsePageSize("40"), parsePageSize("80"), parsePageSize("120")]).toEqual([40, 80, 120]);
+    expect(parsePageSize(String(DEFAULT_PAGE_SIZE))).toBe(DEFAULT_PAGE_SIZE);
     expect([parsePageSize(null), parsePageSize("50"), parsePageSize("abc")])
       .toEqual([DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE]);
   });
@@ -27,8 +28,8 @@ describe("parsePageSize", () => {
 
 describe("pageHref", () => {
   it("leaves the defaults out so page 1 at the default size stays canonical", () => {
-    expect(pageHref(1, 40)).toBe("/domains");
-    expect(pageHref(3, 40)).toBe("/domains?page=3");
+    expect(pageHref(1, DEFAULT_PAGE_SIZE)).toBe("/domains");
+    expect(pageHref(3, DEFAULT_PAGE_SIZE)).toBe("/domains?page=3");
     expect(pageHref(1, 80)).toBe("/domains?pageSize=80");
     expect(pageHref(3, 120)).toBe("/domains?page=3&pageSize=120");
   });

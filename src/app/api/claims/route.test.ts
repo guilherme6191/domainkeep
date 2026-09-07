@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClaimRecord } from "@/lib/db/claims";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import type { ApiError, ClaimPage } from "@/lib/types";
 
 const SESSION_USER = "user_owner";
@@ -40,8 +41,8 @@ describe("GET /api/claims", () => {
     await get("?page=abc&pageSize=50");
 
     expect(listClaims.mock.calls).toEqual([
-      [SESSION_USER, 1, 40],
-      [SESSION_USER, 1, 40],
+      [SESSION_USER, 1, DEFAULT_PAGE_SIZE],
+      [SESSION_USER, 1, DEFAULT_PAGE_SIZE],
     ]);
   });
 

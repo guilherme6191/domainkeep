@@ -49,7 +49,11 @@ export function TablePagination({
           // A different page size renumbers every page, so start again at one.
           onValueChange={(next) => next && router.push(pageHref(1, next))}
         >
-          <SelectTrigger size="sm" className="w-[5.5rem]" aria-label="Rows per page">
+          <SelectTrigger
+            size="sm"
+            className="w-[5.5rem]"
+            aria-label="Rows per page"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -63,43 +67,43 @@ export function TablePagination({
         <span>per page</span>
       </div>
 
-      {pageCount > 1 && (
-        <Pagination className="mx-0 w-auto justify-end">
-          <PaginationContent>
-            <PaginationItem>
-              {/* Held in place rather than hidden at the bounds, so the bar doesn't shift. */}
-              <PaginationPrevious
-                href={pageHref(Math.max(1, page - 1), pageSize)}
-                aria-disabled={page === 1}
-                className={cn(page === 1 && "pointer-events-none opacity-50")}
-              />
-            </PaginationItem>
+      <Pagination className="mx-0 w-auto justify-end">
+        <PaginationContent>
+          <PaginationItem>
+            {/* Held in place rather than hidden at the bounds, so the bar doesn't shift. */}
+            <PaginationPrevious
+              href={pageHref(Math.max(1, page - 1), pageSize)}
+              aria-disabled={page === 1}
+              className={cn(page === 1 && "pointer-events-none opacity-50")}
+            />
+          </PaginationItem>
 
-            {pageRange(page, pageCount).map((entry, index) => (
-              <PaginationItem key={entry === "ellipsis" ? `gap-${index}` : entry}>
-                {entry === "ellipsis" ? (
-                  <PaginationEllipsis />
-                ) : (
-                  <PaginationLink
-                    href={pageHref(entry, pageSize)}
-                    isActive={entry === page}
-                  >
-                    {entry}
-                  </PaginationLink>
-                )}
-              </PaginationItem>
-            ))}
-
-            <PaginationItem>
-              <PaginationNext
-                href={pageHref(Math.min(pageCount, page + 1), pageSize)}
-                aria-disabled={page === pageCount}
-                className={cn(page === pageCount && "pointer-events-none opacity-50")}
-              />
+          {pageRange(page, pageCount).map((entry, index) => (
+            <PaginationItem key={entry === "ellipsis" ? `gap-${index}` : entry}>
+              {entry === "ellipsis" ? (
+                <PaginationEllipsis />
+              ) : (
+                <PaginationLink
+                  href={pageHref(entry, pageSize)}
+                  isActive={entry === page}
+                >
+                  {entry}
+                </PaginationLink>
+              )}
             </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
+          ))}
+
+          <PaginationItem>
+            <PaginationNext
+              href={pageHref(Math.min(pageCount, page + 1), pageSize)}
+              aria-disabled={page === pageCount}
+              className={cn(
+                page === pageCount && "pointer-events-none opacity-50",
+              )}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
   );
 }

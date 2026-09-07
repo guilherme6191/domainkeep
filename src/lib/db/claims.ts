@@ -98,24 +98,44 @@ function unwrapCounted<T>(
   return { data, count: result.count };
 }
 
+async function countClaims(ownerId: string): Promise<number> {
+  const { count } = unwrapCounted(
+    await db()
+      .from(TABLE)
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", ownerId),
+  );
+  return count;
+}
+
 export async function listClaims(
   ownerId: string,
   page: number,
   pageSize: PageSize,
 ): Promise<{ records: ClaimRecord[]; total: number }> {
   const from = (page - 1) * pageSize;
-  const { data, count } = unwrapCounted(
-    await db()
-      .from(TABLE)
-      .select(COLUMNS, { count: "exact" })
-      .eq("owner_id", ownerId)
-      .order("created_at", { ascending: false })
-      // Ties on created_at would otherwise shuffle rows between page requests.
-      .order("id", { ascending: true })
-      .range(from, from + pageSize - 1)
-      .returns<ClaimRow[]>(),
-  );
-  return { records: data.map(toRecord), total: count };
+
+  try {
+    const { data, count } = unwrapCounted(
+      await db()
+        .from(TABLE)
+        .select(COLUMNS, { count: "exact" })
+        .eq("owner_id", ownerId)
+        .order("created_at", { ascending: false })
+        // Ties on created_at would otherwise shuffle rows between page requests.
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1)
+        .returns<ClaimRow[]>(),
+    );
+    return { records: data.map(toRecord), total: count };
+  } catch (error) {
+    // An offset past the last row is a 416 with no count, not an empty page.
+    // The caller promises the true total there, so ask for it on its own.
+    if (error instanceof DatabaseError && error.code === "PGRST103") {
+      return { records: [], total: await countClaims(ownerId) };
+    }
+    throw error;
+  }
 }
 
 export async function getClaim(

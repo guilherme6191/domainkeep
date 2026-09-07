@@ -91,3 +91,23 @@ describe("deleteClaims", () => {
   });
 });
 
+describe("listClaims past the last page", () => {
+  it("reports an empty page and the true total instead of failing", async () => {
+    // PostgREST answers an out-of-range offset with 416, never an empty page.
+    fetchMock.mockResolvedValueOnce(new Response(
+      '{"code":"PGRST103","message":"Requested range not satisfiable","details":"","hint":null}',
+      { status: 416, headers: { "content-type": "application/json" } },
+    ));
+    fetchMock.mockResolvedValueOnce(new Response(null, {
+      status: 200,
+      headers: { "content-type": "application/json", "content-range": "*/5" },
+    }));
+
+    const { records, total } = await listClaims("user-owner", 2, 40);
+
+    expect(records).toEqual([]);
+    expect(total).toBe(5);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1]?.method).toBe("HEAD");
+  });
+});

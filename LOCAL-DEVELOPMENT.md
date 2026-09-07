@@ -4,7 +4,7 @@ How to run the project on your machine, including the one-time Clerk and Supabas
 
 ## Run it
 
-Requires **Node 20+** and **pnpm**.
+Requires **Node 22.12+** and **pnpm**.
 
 ```bash
 pnpm install

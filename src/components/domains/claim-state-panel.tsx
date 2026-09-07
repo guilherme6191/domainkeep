@@ -180,7 +180,7 @@ function TemporaryDnsError() {
 
 function Expired() {
   return (
-    <Alert variant="destructive" className="border-destructive/35">
+    <Alert>
       <AlertCircle />
       <AlertTitle>This verification code has expired.</AlertTitle>
       <AlertDescription>Codes are valid for seven days.</AlertDescription>
@@ -221,7 +221,7 @@ function Verified({ claim }: { claim: ClaimView }) {
 
 function Superseded({ claim }: { claim: ClaimView }) {
   return (
-    <Alert className="border-amber-400/35 text-amber-300">
+    <Alert className="border-red-400/35 text-red-300">
       <AlertTriangle />
       <AlertTitle>Another account proved control of {claim.domain}.</AlertTitle>
       <AlertDescription>
@@ -239,7 +239,7 @@ function Superseded({ claim }: { claim: ClaimView }) {
 function SupersededNote({ claim }: { claim: ClaimView }) {
   if (!claim.supersededAt) return null;
   return (
-    <p className="text-sm text-amber-300/90">
+    <p className="text-sm text-red-300/90">
       This domain moved to another account on{" "}
       {formatDateTimeSentence(claim.supersededAt)}. Verifying again takes it
       back.
@@ -247,8 +247,8 @@ function SupersededNote({ claim }: { claim: ClaimView }) {
   );
 }
 
-// Colour only where something is settled: green verified, amber superseded,
-// red expired. Recoverable failures stay neutral.
+// Colour only where something is settled: green verified, red superseded.
+// Recoverable failures, expiry included, stay neutral.
 export function ClaimStatePanel({ claim }: { claim: ClaimView }) {
   if (claim.state === "superseded") return <Superseded claim={claim} />;
 

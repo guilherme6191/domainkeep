@@ -13,7 +13,9 @@ type Presentation = {
 // pending-with-a-fix state shares one "Needs attention" label. The detail page
 // names the exact state.
 // Amber means "open this", not proof of a mistake: the cause may be propagation,
-// a configuration issue, a lookup failure, or an expired challenge.
+// a configuration issue, a lookup failure, or an expired challenge. Red is
+// reserved for superseded, the one state that changed against the user and has
+// no one-click fix.
 const NEEDS_ATTENTION: Presentation = {
   label: "Needs attention",
   variant: "outline",
@@ -29,7 +31,7 @@ const PRESENTATION: Record<ClaimViewState, Presentation> = {
   superseded: {
     label: "Superseded",
     variant: "outline",
-    className: "border-amber-400/35 bg-amber-500/15 text-amber-300",
+    className: "border-red-400/35 bg-red-500/15 text-red-300",
   },
   expired: NEEDS_ATTENTION,
   setup_required: {

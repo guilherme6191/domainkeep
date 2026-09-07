@@ -156,14 +156,29 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         Generate a new code
       </Button>
       <Button size="sm" onClick={runVerify} disabled={verify.isPending}>
-        {verify.isPending ? (
-          <>
+        {/* Both labels share one grid cell so the button holds a single width
+            across the click. The footer wraps, and a wider pending label
+            pushed the buttons onto a second line. `invisible` keeps the
+            spare label out of the accessibility tree too. */}
+        <span className="grid place-items-center">
+          <span
+            className={cn(
+              "col-start-1 row-start-1",
+              verify.isPending && "invisible",
+            )}
+          >
+            {verifyLabel}
+          </span>
+          <span
+            className={cn(
+              "col-start-1 row-start-1 flex items-center gap-1",
+              !verify.isPending && "invisible",
+            )}
+          >
             <Loader2 className="size-3.5 animate-spin" />
-            Checking DNS…
-          </>
-        ) : (
-          verifyLabel
-        )}
+            Checking…
+          </span>
+        </span>
       </Button>
     </>
   );
@@ -186,7 +201,8 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
 
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-x-8 gap-y-5">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-start gap-2">
+            <StatusBadge state={claim.state} />
             <span className="flex items-center gap-1">
               <span className="font-mono">{claim.domain}</span>
               <CopyButton
@@ -194,11 +210,10 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
                 label="domain"
                 className="size-6 shrink-0"
               />
+              {claim.verifiedAt !== null ? null : (
+                <EditDomainDialog claimId={claim.id} domain={claim.domain} />
+              )}
             </span>
-            <StatusBadge state={claim.state} />
-            {claim.verifiedAt !== null ? null : (
-              <EditDomainDialog claimId={claim.id} domain={claim.domain} />
-            )}
           </div>
 
           <div className="flex flex-wrap gap-x-8 gap-y-4">

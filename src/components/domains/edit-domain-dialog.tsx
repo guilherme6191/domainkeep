@@ -68,7 +68,7 @@ export function EditDomainDialog({
           <Button
             variant="ghost"
             size="icon"
-            className="size-7"
+            className="size-6 shrink-0"
             aria-label="Edit domain"
           />
         }

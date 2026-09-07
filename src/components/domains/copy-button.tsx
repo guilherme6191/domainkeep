@@ -2,6 +2,7 @@
 
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 export function CopyButton({
@@ -33,7 +34,8 @@ export function CopyButton({
           await navigator.clipboard.writeText(value);
           setCopied(true);
         } catch {
-          // Clipboard access can be denied; the value stays selectable on screen.
+          setCopied(false);
+          toast.error("Couldn't copy. Select the value to copy it manually.");
         }
       }}
     >

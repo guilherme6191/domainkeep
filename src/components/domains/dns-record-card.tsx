@@ -8,21 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { VERIFICATION_VALUE_PREFIX } from "@/lib/types";
-
-/** Elides the token, never the prefix: the prefix is how the user finds the
- * value again among everything else at the name. */
-export function truncateToken(value: string): string {
-  const token = value.startsWith(VERIFICATION_VALUE_PREFIX)
-    ? value.slice(VERIFICATION_VALUE_PREFIX.length)
-    : "";
-  if (!token) {
-    return value.length > 20 ? `${value.slice(0, 8)}…${value.slice(-8)}` : value;
-  }
-  const shortened =
-    token.length > 20 ? `${token.slice(0, 6)}…${token.slice(-6)}` : token;
-  return `${VERIFICATION_VALUE_PREFIX}${shortened}`;
-}
 
 const COLUMNS = "sm:grid-cols-[5rem_4rem_1fr_4rem]";
 
@@ -101,10 +86,10 @@ export function DnsRecordCard({
             <Cell label="Value">
               <span className="flex items-center gap-1">
                 <span
-                  className={cn("truncate", inactive && "line-through")}
+                  className={cn("min-w-0 truncate select-all", inactive && "line-through")}
                   title={value}
                 >
-                  {truncateToken(value)}
+                  {value}
                 </span>
                 {inactive ? null : (
                   <CopyButton

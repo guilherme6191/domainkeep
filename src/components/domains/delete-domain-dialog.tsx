@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useDeleteClaim } from "@/hooks/use-claims";
+import { toastApiError } from "@/lib/api/toast-error";
 
 export function DeleteDomainDialog({
   claimId,
@@ -53,7 +54,16 @@ export function DeleteDomainDialog({
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={deleteClaim.isPending}
-            onClick={() => deleteClaim.mutate(claimId)}
+            onClick={() => deleteClaim.mutate(claimId, {
+              onError: (error) => {
+                // Close so the modal cannot obscure or isolate the toast.
+                setOpen(false);
+                toastApiError(
+                  error,
+                  "Couldn't delete the domain. Please try again.",
+                );
+              },
+            })}
           >
             {deleteClaim.isPending ? "Deleting…" : "Delete domain"}
           </AlertDialogAction>

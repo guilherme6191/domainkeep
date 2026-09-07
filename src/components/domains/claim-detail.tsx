@@ -18,19 +18,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClaim, useReplaceToken, useVerifyClaim } from "@/hooks/use-claims";
 import { ApiRequestError } from "@/lib/api/client";
+import { toastApiError } from "@/lib/api/toast-error";
 import { lastCheckedAt } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-function toastApiError(error: unknown) {
-  if (error instanceof ApiRequestError) {
-    toast.error(error.message, {
-      description: error.requestId ? `Reference: ${error.requestId}` : undefined,
-    });
-    return;
-  }
-  toast.error("Something went wrong. Please try again.");
-}
 
 // Relative time, with the exact instant on hover.
 function Meta({ label, iso }: { label: string; iso: string }) {
@@ -132,7 +123,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           toast.success(`You control ${updated.domain}.`);
         }
       },
-      onError: toastApiError,
+      onError: (error) => toastApiError(error),
     });
   }
 
@@ -163,7 +154,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
       </p>
       <Button
         size="sm"
-        onClick={() => replaceToken.mutate(undefined, { onError: toastApiError })}
+        onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
         disabled={replaceToken.isPending}
       >
         {replaceToken.isPending ? "Generating…" : "Generate a new code"}
@@ -174,7 +165,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => replaceToken.mutate(undefined, { onError: toastApiError })}
+        onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
         disabled={replaceToken.isPending}
       >
         Generate a new code

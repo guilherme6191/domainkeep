@@ -249,7 +249,7 @@ export async function deleteClaim(id: string, ownerId: string): Promise<boolean>
 }
 
 /**
- * Claims the right to email the holder this takeover displaced, at most once.
+ * Claims a notification attempt for the holder this takeover displaced.
  *
  * The transfer stamps the loser's `superseded_at` and the winner's
  * `took_over_at` with the same `now()` inside one transaction, so the displaced
@@ -259,12 +259,13 @@ export async function deleteClaim(id: string, ownerId: string): Promise<boolean>
  * `[tookOverAt, tookOverAt + 1ms)`. A later takeover of the same domain would
  * match a plain `>=`, so the upper bound is load-bearing — do not drop it.
  *
- * Setting the column in the same statement that selects the row is what makes
- * this at-most-once: a concurrent request gets zero rows back and sends nothing.
+ * A conditional update suppresses duplicate attempts, assuming application
+ * time is not behind the database takeover time. The historical timestamp
+ * window is a lookup convention, not a database-enforced event identifier.
  * The guard compares `takeover_notified_at` against this takeover's instant
  * rather than requiring null, because a claim can be lost, won back, and lost
  * again — a plain null check would notify only the first time. A notice already
- * claimed for *this* takeover was stamped after it, so it still blocks.
+ * claimed for *this* takeover blocks again if its marker is at or after it.
  */
 export async function claimTakeoverNotification(input: {
   normalizedDomain: string;

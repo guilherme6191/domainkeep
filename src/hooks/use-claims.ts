@@ -1,36 +1,61 @@
 "use client";
 
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
   type UseMutationOptions,
 } from "@tanstack/react-query";
 import { claimsApi } from "@/lib/api/client";
-import type { ClaimView } from "@/lib/types";
+import type { PageSize } from "@/lib/pagination";
+import type { ClaimPage, ClaimView } from "@/lib/types";
 
 const claimsKey = ["claims"] as const;
+// "list" separates page envelopes from the bare ClaimView held under an id,
+// so a write across every cached page can't reach a detail entry.
+const claimListPrefix = ["claims", "list"] as const;
+const claimListKey = (page: number, pageSize: PageSize) =>
+  ["claims", "list", page, pageSize] as const;
 const claimKey = (id: string) => ["claims", id] as const;
 
-export function useClaims() {
-  return useQuery({ queryKey: claimsKey, queryFn: claimsApi.list });
+export function useClaims(page: number, pageSize: PageSize) {
+  return useQuery({
+    queryKey: claimListKey(page, pageSize),
+    queryFn: () => claimsApi.list(page, pageSize),
+    // Keep the rows on screen while the next page loads.
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useClaim(id: string) {
   return useQuery({ queryKey: claimKey(id), queryFn: () => claimsApi.get(id) });
 }
 
-// Replace if present, prepend if new (the list is newest-first). An unfetched
-// list stays unfetched rather than becoming a partial one.
-function upsertClaim(claims: ClaimView[] | undefined, claim: ClaimView) {
-  if (!claims) return claims;
+// Replace only: a new claim belongs to whichever page the server puts it on,
+// which this cache cannot know. An unfetched page stays unfetched.
+function replaceClaim(page: ClaimPage | undefined, claim: ClaimView) {
+  if (!page) return page;
 
-  const index = claims.findIndex((existing) => existing.id === claim.id);
-  if (index === -1) return [claim, ...claims];
+  const index = page.items.findIndex((existing) => existing.id === claim.id);
+  if (index === -1) return page;
 
-  const next = claims.slice();
-  next[index] = claim;
-  return next;
+  const items = page.items.slice();
+  items[index] = claim;
+  return { ...page, items };
+}
+
+/** Drops rows from every cached page and keeps `total` honest. */
+export function evictClaims(queryClient: QueryClient, ids: string[]) {
+  for (const id of ids) queryClient.removeQueries({ queryKey: claimKey(id) });
+
+  queryClient.setQueriesData<ClaimPage>({ queryKey: claimListPrefix }, (page) => {
+    if (!page) return page;
+    // The rows are gone everywhere, so every cached page's total drops.
+    const items = page.items.filter((claim) => !ids.includes(claim.id));
+    return { ...page, items, total: Math.max(0, page.total - ids.length) };
+  });
 }
 
 type ClaimMutationOptions<TVariables> = Omit<
@@ -56,8 +81,9 @@ function useClaimMutation<TVariables>(
       queryClient.setQueryData(claimKey(claim.id), claim);
 
       if (syncList) {
-        queryClient.setQueryData<ClaimView[]>(claimsKey, (claims) =>
-          upsertClaim(claims, claim),
+        queryClient.setQueriesData<ClaimPage>(
+          { queryKey: claimListPrefix },
+          (page) => replaceClaim(page, claim),
         );
       }
 
@@ -105,13 +131,9 @@ export function useDeleteClaim(options?: { onSuccess?: () => void }) {
   return useMutation({
     mutationFn: (id: string) => claimsApi.remove(id),
     onSuccess: (_data, id) => {
-      queryClient.removeQueries({ queryKey: claimKey(id) });
-
       // Deleting from the detail page returns to the list, which must not paint
       // the removed row first.
-      queryClient.setQueryData<ClaimView[]>(claimsKey, (claims) =>
-        claims?.filter((claim) => claim.id !== id),
-      );
+      evictClaims(queryClient, [id]);
       void queryClient.invalidateQueries({
         queryKey: claimsKey,
         refetchType: "none",

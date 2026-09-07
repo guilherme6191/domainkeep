@@ -55,6 +55,17 @@ interface ClaimView {
 }
 ```
 
+The list route wraps that projection in a page envelope, so the client never hardcodes a page size:
+
+```ts
+interface ClaimPage {
+  items: ClaimView[];  // newest first, then id ascending
+  page: number;
+  pageSize: number;    // 40, 80, or 120; anything else is read as 40
+  total: number;       // all of the caller's claims, not this page
+}
+```
+
 The projection omits `ownerId`, serializes dates, and derives `state` on the server. Transfer timestamps describe the caller's association without identifying another account. Their meaning and constraints are defined in [Data model](#data-model).
 
 ### Takeover disclosure
@@ -67,13 +78,15 @@ A domain held elsewhere produces the same creation response and DNS diagnoses as
 
 | Method and route | Success | Body in | Body out |
 | --- | --- | --- | --- |
-| `GET /api/claims` | `200` | — | `ClaimView[]`, newest first |
+| `GET /api/claims?page=N&pageSize=M` | `200` | — | `ClaimPage`, newest first |
 | `POST /api/claims` | `201` new, `200` existing | `{ domain: string }` | `ClaimView` |
 | `GET /api/claims/:id` | `200` | — | `ClaimView` |
 | `PATCH /api/claims/:id` | `200` | `{ domain: string }` | `ClaimView` |
 | `POST /api/claims/:id/verify` | `200` | — | `ClaimView` |
 | `POST /api/claims/:id/replace-token` | `200` | — | `ClaimView` |
 | `DELETE /api/claims/:id` | `204` | — | — |
+
+A page past the end returns an empty `items` with the true `total`; the client clamps its own URL rather than being redirected. A malformed `page` or an unoffered `pageSize` is read as the default rather than rejected.
 
 Ownership comes from the server session. The only meaningful request-body field is `domain`; callers cannot supply ownership, proof tokens, state, or timestamps.
 

@@ -1,6 +1,7 @@
 import "server-only";
 import type { PostgrestError } from "@supabase/supabase-js";
 import type { LastCheck, LastCheckResult, DomainClaim } from "@/lib/types";
+import type { PageSize } from "@/lib/pagination";
 import { db, dbAdmin } from "@/lib/db/client";
 
 export interface ClaimRecord {
@@ -86,16 +87,35 @@ function unwrap<T>(result: Result<T>): T {
   return result.data;
 }
 
-export async function listClaims(ownerId: string): Promise<ClaimRecord[]> {
-  const rows = unwrap(
+/** A null count means it was never requested, which is a bug, not an empty table. */
+function unwrapCounted<T>(
+  result: Result<T> & { count: number | null },
+): { data: T; count: number } {
+  const data = unwrap(result);
+  if (result.count === null) {
+    throw new Error("Counted query returned no count.");
+  }
+  return { data, count: result.count };
+}
+
+export async function listClaims(
+  ownerId: string,
+  page: number,
+  pageSize: PageSize,
+): Promise<{ records: ClaimRecord[]; total: number }> {
+  const from = (page - 1) * pageSize;
+  const { data, count } = unwrapCounted(
     await db()
       .from(TABLE)
-      .select(COLUMNS)
+      .select(COLUMNS, { count: "exact" })
       .eq("owner_id", ownerId)
       .order("created_at", { ascending: false })
+      // Ties on created_at would otherwise shuffle rows between page requests.
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1)
       .returns<ClaimRow[]>(),
   );
-  return rows.map(toRecord);
+  return { records: data.map(toRecord), total: count };
 }
 
 export async function getClaim(

@@ -10,18 +10,31 @@ import {
   listClaims,
 } from "@/lib/db/claims";
 import { normalizeDomain } from "@/lib/domain";
+import { parsePage, parsePageSize } from "@/lib/pagination";
 import { createVerificationToken, tokenExpiryFrom } from "@/lib/token";
+import type { ClaimPage } from "@/lib/types";
 
 const createBody = z.object({ domain: z.string() });
 
-export async function GET() {
+export async function GET(request: Request) {
   const ownerId = await currentUserId();
   if (!ownerId) return apiError("unauthenticated", "Sign in to continue.");
 
+  const query = new URL(request.url).searchParams;
+  const page = parsePage(query.get("page"));
+  const pageSize = parsePageSize(query.get("pageSize"));
+
   try {
-    const records = await listClaims(ownerId);
+    // A page past the end is empty but still reports the true total; the
+    // client clamps its own URL rather than being redirected.
+    const { records, total } = await listClaims(ownerId, page, pageSize);
     const now = new Date();
-    return NextResponse.json(records.map((record) => toClaimView(record, now)));
+    return NextResponse.json({
+      items: records.map((record) => toClaimView(record, now)),
+      page,
+      pageSize,
+      total,
+    } satisfies ClaimPage);
   } catch (error) {
     return internalError("GET /api/claims", error);
   }

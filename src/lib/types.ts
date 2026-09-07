@@ -57,6 +57,14 @@ export interface ClaimView {
   createdAt: string;
 }
 
+/** One page of the caller's claims; `total` counts all of them, not this page. */
+export interface ClaimPage {
+  items: ClaimView[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 export type ErrorCode =
   | "unauthenticated"
   | "not_found"

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { DeleteDomainDialog } from "@/components/domains/delete-domain-dialog";
 import { StatusBadge } from "@/components/domains/status-badge";
+import { TablePagination } from "@/components/domains/table-pagination";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -15,8 +16,9 @@ import {
 } from "@/components/ui/table";
 import { lastCheckedAt } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
+import { PAGE_SIZES, type PageSize } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
-import type { ClaimView } from "@/lib/types";
+import type { ClaimPage } from "@/lib/types";
 
 function LastCheckedCell({ iso }: { iso: string | null }) {
   if (!iso) {
@@ -33,7 +35,14 @@ function LastCheckedCell({ iso }: { iso: string | null }) {
   );
 }
 
-export function DomainsTable({ claims }: { claims: ClaimView[] }) {
+export function DomainsTable({ page }: { page: ClaimPage }) {
+  const claims = page.items;
+  const pageSize = page.pageSize as PageSize;
+  const pageCount = Math.max(1, Math.ceil(page.total / pageSize));
+  // The bar carries the size control, so it stays while a smaller size would
+  // still paginate — otherwise 80 rows at size 120 could never go back to 40.
+  const showPagination = page.total > PAGE_SIZES[0];
+
   return (
     <div className="overflow-hidden rounded-xl border">
       <Table>
@@ -102,6 +111,15 @@ export function DomainsTable({ claims }: { claims: ClaimView[] }) {
           ))}
         </TableBody>
       </Table>
+
+      {showPagination && (
+        <TablePagination
+          page={page.page}
+          pageSize={pageSize}
+          pageCount={pageCount}
+          total={page.total}
+        />
+      )}
     </div>
   );
 }

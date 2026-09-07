@@ -1,4 +1,5 @@
-import type { ApiError, ClaimView } from "@/lib/types";
+import type { ApiError, ClaimPage, ClaimView } from "@/lib/types";
+import type { PageSize } from "@/lib/pagination";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -33,7 +34,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const claimsApi = {
-  list: () => request<ClaimView[]>("/api/claims"),
+  list: (page: number, pageSize: PageSize) =>
+    request<ClaimPage>(`/api/claims?page=${page}&pageSize=${pageSize}`),
   get: (id: string) => request<ClaimView>(`/api/claims/${id}`),
   create: (domain: string) =>
     request<ClaimView>("/api/claims", {

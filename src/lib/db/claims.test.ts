@@ -11,7 +11,7 @@ vi.mock("@/lib/db/client", async () => {
   return { dbAdmin: () => client, db: () => client };
 });
 
-const { updateClaimDomain } = await import("@/lib/db/claims");
+const { listClaims, updateClaimDomain } = await import("@/lib/db/claims");
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -45,5 +45,28 @@ describe("updateClaimDomain", () => {
     expect(body.normalized_domain).toBe("example.com");
     expect(body).not.toHaveProperty("verified_at");
     expect(body).not.toHaveProperty("superseded_at");
+  });
+});
+
+describe("listClaims", () => {
+  it("asks the database for one page and the true total", async () => {
+    fetchMock.mockResolvedValue(new Response("[]", {
+      status: 200,
+      headers: { "content-type": "application/json", "content-range": "80-82/83" },
+    }));
+
+    const { records, total } = await listClaims("user-owner", 3, 40);
+
+    expect(records).toEqual([]);
+    expect(total).toBe(83);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0];
+    const query = new URL(String(url)).searchParams;
+    expect(query.get("owner_id")).toBe("eq.user-owner");
+    // id breaks created_at ties, so offsets stay deterministic across pages.
+    expect(query.get("order")).toBe("created_at.desc,id.asc");
+    expect(query.get("offset")).toBe("80");
+    expect(query.get("limit")).toBe("40");
+    expect(String(new Headers(init?.headers).get("prefer"))).toContain("count=exact");
   });
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AddDomainDialog } from "@/components/domains/add-domain-dialog";
 import { AddDomainForm } from "@/components/domains/add-domain-form";
 import { DomainsTable } from "@/components/domains/domains-table";
@@ -13,9 +15,25 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClaims } from "@/hooks/use-claims";
+import { pageHref, parsePage, parsePageSize } from "@/lib/pagination";
 
 export default function DomainsPage() {
-  const { data: claims, isPending, isError } = useClaims();
+  // No Suspense boundary: this route is dynamic because its layout awaits
+  // auth.protect(), and only statically prerendered pages need one.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const page = parsePage(searchParams.get("page"));
+  const pageSize = parsePageSize(searchParams.get("pageSize"));
+
+  const { data, isPending, isError, isPlaceholderData } = useClaims(page, pageSize);
+  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+
+  // Deleting the last row of the last page leaves the URL past the end.
+  useEffect(() => {
+    if (data && !isPlaceholderData && page > pageCount) {
+      router.replace(pageHref(pageCount, pageSize));
+    }
+  }, [data, isPlaceholderData, page, pageCount, pageSize, router]);
 
   return (
     <>
@@ -30,7 +48,7 @@ export default function DomainsPage() {
           <p className="text-sm">
             We couldn&rsquo;t load your domains. Please refresh and try again.
           </p>
-        ) : claims.length === 0 ? (
+        ) : data.total === 0 ? (
           <div className="mx-auto max-w-md space-y-4 py-10">
             <Card>
               <CardHeader>
@@ -54,7 +72,10 @@ export default function DomainsPage() {
               <h1 className="text-xl font-semibold tracking-tight">Domains</h1>
               <AddDomainDialog />
             </div>
-            <DomainsTable claims={claims} />
+            {/* Dimmed, not replaced: the previous page stays put while the next loads. */}
+            <div className={isPlaceholderData ? "opacity-60 transition-opacity" : undefined}>
+              <DomainsTable page={data} />
+            </div>
           </div>
         )}
       </main>

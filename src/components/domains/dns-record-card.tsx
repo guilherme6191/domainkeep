@@ -10,9 +10,27 @@ import {
 } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { recordName } from "@/lib/domain";
+import { VERIFICATION_VALUE_PREFIX } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const COLUMNS = "sm:grid-cols-[5rem_8rem_1fr_4rem]";
+const COLUMNS = "sm:grid-cols-[5rem_11rem_1fr_4rem]";
+
+// The table shows a short form of the value: the prefix, then ten hex digits
+// at each end, enough to tell one token from another where it was pasted.
+// The copy button carries the full value and its own manual fallback.
+const VISIBLE_DIGITS = 10;
+
+function ShortValue({ value }: { value: string }) {
+  const token = value.slice(VERIFICATION_VALUE_PREFIX.length);
+  return (
+    <>
+      {VERIFICATION_VALUE_PREFIX}
+      {token.slice(0, VISIBLE_DIGITS)}
+      <span className="text-muted-foreground">[…]</span>
+      {token.slice(-VISIBLE_DIGITS)}
+    </>
+  );
+}
 
 // Provider-style table on `sm` and up; labels move inline on phones.
 function Cell({
@@ -26,8 +44,8 @@ function Cell({
 }) {
   return (
     <div className={cn("min-w-0 space-y-1 sm:space-y-0", className)}>
-      <div className="text-muted-foreground text-sm sm:hidden">{label}</div>
-      <div className="font-mono text-sm">{children}</div>
+      <div className="text-muted-foreground text-[13px] sm:hidden">{label}</div>
+      <div className="font-mono text-[13px]">{children}</div>
     </div>
   );
 }
@@ -97,7 +115,7 @@ export function DnsRecordCard({
         <div className="overflow-hidden rounded-lg border">
           <div
             className={cn(
-              "text-muted-foreground hidden border-b px-4 py-2.5 text-sm font-medium sm:grid sm:gap-4",
+              "text-muted-foreground hidden border-b px-4 py-2.5 text-[13px] font-medium sm:grid sm:gap-4",
               COLUMNS,
             )}
           >
@@ -129,11 +147,8 @@ export function DnsRecordCard({
             </Cell>
             <Cell label="Value">
               <span className="flex items-center gap-1">
-                <span
-                  className={cn("min-w-0 truncate select-all", inactive && "line-through")}
-                  title={value}
-                >
-                  {value}
+                <span className={cn(inactive && "line-through")} title={value}>
+                  <ShortValue value={value} />
                 </span>
                 {inactive ? null : (
                   <CopyButton

@@ -154,7 +154,7 @@ The Name field shows the claimed name relative to its registrable domain, which 
 
 The registrable domain is the last two labels, or three when the last two are in the same pragmatic public-suffix set `normalizeDomain` uses. The one case this does not fit is a delegated zone whose root is the subdomain itself, where `@` is right; the Name popover covers it, and the full-hostname line under the table is the invariant to check against.
 
-The full value remains selectable text even when visually truncated. The copy action uses the complete value; clipboard failure shows a toast directing the user to select it manually.
+The table shows a short form of the value: the prefix, then the first and last ten hex digits of the token, enough to tell one token from another where it was pasted; the full value is on the cell's title. The copy action uses the complete value; clipboard failure shows a toast directing the user to select it manually.
 
 ### Token generation
 

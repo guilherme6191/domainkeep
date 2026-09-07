@@ -56,14 +56,14 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("copy recovery", () => {
-  it("keeps the full TXT value in selectable text, not just a title attribute", () => {
+  it("shows a short form of the value and keeps the full one on the copy button", () => {
     const html = renderToStaticMarkup(createElement(DnsRecordCard, {
       value: VALUE,
       hostname: "example.com",
     }));
-    expect(html).toContain(`>${VALUE}</span>`);
-    expect(html).toContain("select-all");
-    expect(html).not.toContain("…");
+    expect(html).toContain(`>resend-verify=${"a".repeat(10)}<span`);
+    expect(html).toContain(`>[…]</span>${"a".repeat(10)}</span>`);
+    expect(html).toContain(`title="${VALUE}"`);
   });
 
   // The manual-selection popover that a rejected clipboard opens is component

@@ -14,7 +14,7 @@ export default function DomainDetailPage({
   return (
     <>
       <AppHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <ClaimDetail claimId={id} />
       </main>
     </>

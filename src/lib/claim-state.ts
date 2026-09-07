@@ -44,13 +44,17 @@ export function getClaimViewState(
 }
 
 /**
- * The instant the list and the detail page both call "last checked". A
- * verified claim's last check that mattered is the one that verified it;
- * `lastCheck` only ever holds a check that did not.
+ * The instant the list and the detail page both call "last checked": the most
+ * recent check that ran, whether it verified the claim or not. `lastCheck`
+ * only ever holds a check that did not; `verifiedAt` is the one that did, and
+ * it survives supersession, so a superseded claim still says when it was last
+ * checked rather than pretending it never was.
  */
 export function lastCheckedAt(
-  claim: Pick<ClaimView, "state" | "verifiedAt" | "lastCheck">,
+  claim: Pick<ClaimView, "verifiedAt" | "lastCheck">,
 ): string | null {
-  if (claim.state === "verified" && claim.verifiedAt) return claim.verifiedAt;
-  return claim.lastCheck?.checkedAt ?? null;
+  const candidates = [claim.verifiedAt, claim.lastCheck?.checkedAt ?? null]
+    .filter((iso): iso is string => iso !== null);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((latest, iso) => (iso > latest ? iso : latest));
 }

@@ -9,12 +9,11 @@ import {
   deleteClaims,
   findClaimByDomain,
   insertClaim,
-  listClaims,
 } from "@/lib/db/claims";
+import { loadClaimPage } from "@/lib/claims-page";
 import { normalizeDomain } from "@/lib/domain";
 import { PAGE_SIZES, parsePage, parsePageSize } from "@/lib/pagination";
 import { createVerificationToken, tokenExpiryFrom } from "@/lib/token";
-import type { ClaimPage } from "@/lib/types";
 
 const createBody = z.object({ domain: z.string() });
 
@@ -27,16 +26,7 @@ export async function GET(request: Request) {
   const pageSize = parsePageSize(query.get("pageSize"));
 
   try {
-    // A page past the end is empty but still reports the true total; the
-    // client clamps its own URL rather than being redirected.
-    const { records, total } = await listClaims(ownerId, page, pageSize);
-    const now = new Date();
-    return NextResponse.json({
-      items: records.map((record) => toClaimView(record, now)),
-      page,
-      pageSize,
-      total,
-    } satisfies ClaimPage);
+    return NextResponse.json(await loadClaimPage(ownerId, page, pageSize));
   } catch (error) {
     return internalError("GET /api/claims", error);
   }

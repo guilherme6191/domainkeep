@@ -10,15 +10,13 @@ import {
 } from "@tanstack/react-query";
 import { claimsApi } from "@/lib/api/client";
 import type { PageSize } from "@/lib/pagination";
+import {
+  claimKey,
+  claimListKey,
+  claimListPrefix,
+  claimsKey,
+} from "@/lib/query-keys";
 import type { ClaimPage, ClaimView } from "@/lib/types";
-
-const claimsKey = ["claims"] as const;
-// "list" separates page envelopes from the bare ClaimView held under an id,
-// so a write across every cached page can't reach a detail entry.
-const claimListPrefix = ["claims", "list"] as const;
-const claimListKey = (page: number, pageSize: PageSize) =>
-  ["claims", "list", page, pageSize] as const;
-const claimKey = (id: string) => ["claims", id] as const;
 
 export function useClaims(page: number, pageSize: PageSize) {
   return useQuery({

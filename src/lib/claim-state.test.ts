@@ -103,6 +103,8 @@ describe("lastCheckedAt", () => {
     ["failed check", { state: "record_not_found", verifiedAt: null, lastCheck: failed }, CHECKED],
     ["never checked", { state: "setup_required", verifiedAt: null, lastCheck: null }, null],
     ["superseded with a later failed check", { state: "superseded", verifiedAt: VERIFIED, lastCheck: failed }, CHECKED],
+    // Supersession clears nothing on the loser, so its last check is still the one that verified it.
+    ["superseded, never checked since", { state: "superseded", verifiedAt: VERIFIED, lastCheck: null }, VERIFIED],
   ] as const)("%s", (_name, view, expected) => {
     expect(lastCheckedAt(view)).toBe(expected);
   });

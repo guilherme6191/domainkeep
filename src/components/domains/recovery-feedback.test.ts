@@ -76,6 +76,19 @@ describe("copy recovery", () => {
     expect(copyClick).toBeDefined();
     await copyClick!();
     expect(writeText).toHaveBeenCalledWith(VALUE);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast when clipboard access fails", async () => {
+    vi.stubGlobal("navigator", {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("Denied")) },
+    });
+    renderToStaticMarkup(createElement(CopyButton, { value: VALUE, label: "value" }));
+    expect(copyClick).toBeDefined();
+    await copyClick!();
+    expect(toastError).toHaveBeenCalledWith(
+      "Couldn't copy. Select the value to copy it manually.",
+    );
   });
 });
 

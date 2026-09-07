@@ -2,13 +2,13 @@
 
 import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 
 /**
- * On success this is just a button. The full value only appears when the
- * clipboard refuses, because that is the one moment "select it manually" is
- * unfollowable on its own: the value it refers to is truncated in the column.
+ * On success this is just a button. When the clipboard refuses, a toast names
+ * the failure and the popover exposes the full value for manual selection.
  *
  * The popover is anchored to the button rather than triggered by it, so the
  * only thing that can open it is a failed copy.
@@ -50,6 +50,7 @@ export function CopyButton({
           } catch {
             setCopied(false);
             setFailed(true);
+            toast.error("Couldn't copy. Select the value to copy it manually.");
           }
         }}
       >

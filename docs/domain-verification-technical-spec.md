@@ -268,7 +268,9 @@ function getClaimViewState(claim: DomainClaim, now: Date): ClaimViewState {
 
 **List presentation.** One badge component maps `verified` → Verified, `setup_required` → Unchecked, diagnostic states and `expired` → Needs attention, and `superseded` → Superseded. The detail panel names the precise outcome. This mapping never affects state derivation.
 
-Verified associations outlive token expiry and TXT removal. Successful verification clears `lastCheck`. Known implementation gaps: replacement checks verified status before, but not during, its write; failed-check writes guard the token but not verified status. Concurrent requests can therefore replace a just-verified token or repopulate `lastCheck` after success. Neither grants an unproven association. The detail card also currently dims a verified record after token expiry. These gaps do not change the intended rules above.
+Verified associations outlive token expiry and TXT removal. Successful verification clears `lastCheck`. Known implementation gaps: replacement checks verified status before, but not during, its write; failed-check writes guard the token but not verified status. Concurrent requests can therefore replace a just-verified token or repopulate `lastCheck` after success. Neither grants an unproven association. These gaps do not change the intended rules above.
+
+Token lifetime is a property of a pending challenge. The client never reads `tokenExpiresAt` to decide anything; it displays the instant and takes every decision from `state`. A verified claim shows no record at all, since the proof is complete and the TXT value has no ongoing job; the verified panel tells the user they may remove it.
 
 ### Reassignment and atomicity
 

@@ -66,6 +66,34 @@ describe("claim detail loading errors", () => {
   });
 });
 
+describe("claim detail verified view", () => {
+  it("shows no record and no struck-through value once the token has aged out", () => {
+    const claim: ClaimView = {
+      id: "claim-id",
+      domain: "example.com",
+      verificationHostname: "example.com",
+      token: "a".repeat(64),
+      recordValue: `resend-verify=${"a".repeat(64)}`,
+      // Long past: verification outlives the challenge, and the view must not
+      // read the token's age as "needs a new code".
+      tokenExpiresAt: "2026-08-01T00:00:00Z",
+      verifiedAt: "2026-07-25T00:00:00Z",
+      supersededAt: null,
+      tookOverAt: null,
+      state: "verified",
+      lastCheck: null,
+      createdAt: "2026-07-24T00:00:00Z",
+    };
+    useClaimMock.mockReturnValue({ data: claim });
+    const html = render();
+    expect(html).not.toContain(claim.recordValue);
+    expect(html).not.toContain("line-through");
+    expect(html).not.toContain("Generate a new code");
+    expect(html).toContain("Delete domain control");
+    expect(html).toContain("You can remove the");
+  });
+});
+
 describe("claim detail edit eligibility", () => {
   it.each([null, "2026-09-05T00:00:00Z"])(
     "uses verification history (%s), even when the current state is setup_required",

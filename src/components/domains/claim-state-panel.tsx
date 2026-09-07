@@ -211,6 +211,10 @@ function Verified({ claim }: { claim: ClaimView }) {
             ? `Verified on ${formatDateTimeSentence(claim.verifiedAt)}.`
             : "DNS control confirmed at the time of the check."}
         </p>
+        <p>
+          You can remove the <Mono>{VERIFICATION_VALUE_PREFIX}</Mono> TXT
+          value from <Mono>{claim.domain}</Mono> now if you&rsquo;d like.
+        </p>
         {claim.tookOverAt ? (
           <RecentTakeoverNotice key={claim.tookOverAt} tookOverAt={claim.tookOverAt} />
         ) : null}

@@ -98,8 +98,9 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   }
 
   const isVerified = claim.state === "verified";
-  const challengeActive = new Date(claim.tokenExpiresAt) > new Date();
-  const needsNewCode = claim.state === "expired" || !challengeActive;
+  // Read from the server's state, never from `tokenExpiresAt`: a verified claim
+  // has no challenge, so its token's age means nothing here.
+  const needsNewCode = claim.state === "expired" || claim.state === "superseded";
   const checkedBefore = claim.lastCheck !== null;
   const verifyLabel = checkedBefore ? "Check again" : "Verify domain";
   const lastChecked = lastCheckedAt(claim);
@@ -133,9 +134,8 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     />
   );
 
-  const actions = isVerified ? (
-    deleteDomain
-  ) : needsNewCode ? (
+  // Verified has nothing left to do here; its delete control is in the header.
+  const actions = isVerified ? null : needsNewCode ? (
     <Button
       size="sm"
       onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
@@ -181,7 +181,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           <ArrowLeft className="size-3.5" />
           Domains
         </Link>
-        {isVerified ? null : deleteDomain}
+        {deleteDomain}
       </div>
 
       <Card>
@@ -208,7 +208,13 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
             ) : null}
             {isVerified ? null : (
               <Meta
-                label={needsNewCode ? "Code expired" : "Code expires"}
+                label={
+                  claim.state === "superseded"
+                    ? "Code invalidated"
+                    : needsNewCode
+                      ? "Code expired"
+                      : "Code expires"
+                }
                 iso={claim.tokenExpiresAt}
               />
             )}
@@ -218,21 +224,15 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
 
       <ClaimStatePanel claim={claim} />
 
-      {showComparison ? (
+      {/* Verification is point-in-time, so a verified claim has no record to
+          show: the proof is done and the TXT value has no ongoing job. */}
+      {isVerified ? null : showComparison ? (
         <ExpectedVsFoundCard claim={claim} footer={actions} />
       ) : (
         <DnsRecordCard
           value={claim.recordValue}
           hostname={claim.verificationHostname}
-          title={isVerified ? "Verification record" : "Add this DNS record"}
-          description={
-            isVerified ? "The record we matched during the last check." : undefined
-          }
-          note={
-            isVerified ? (
-              <p>You can remove this TXT value now if you&rsquo;d like.</p>
-            ) : undefined
-          }
+          title={needsNewCode ? "Previous record" : "Add this DNS record"}
           inactive={needsNewCode}
           footer={actions}
         />

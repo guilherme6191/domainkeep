@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -70,16 +69,12 @@ export function DnsRecordCard({
   value,
   hostname,
   title = "Add this DNS record",
-  description,
-  note,
   inactive = false,
   footer,
 }: {
   value: string;
   hostname: string;
   title?: string;
-  description?: string;
-  note?: React.ReactNode;
   inactive?: boolean;
   footer?: React.ReactNode;
 }) {
@@ -87,7 +82,6 @@ export function DnsRecordCard({
     <Card>
       <CardHeader className={cn(inactive && "opacity-40")}>
         <CardTitle>{title}</CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
 
       <CardContent className={cn(inactive && "opacity-40")}>
@@ -141,20 +135,18 @@ export function DnsRecordCard({
         </div>
 
         <div className="text-muted-foreground pt-3.5 text-sm">
-          {note ?? (
-            <p>
-              The record&rsquo;s full name must be{" "}
-              <span className="text-foreground font-mono">{hostname}</span>
-              {inactive ? null : (
-                <CopyButton
-                  value={hostname}
-                  label="full name"
-                  className="ml-1 -mr-1 size-6 align-middle"
-                />
-              )}
-              . Add it alongside any TXT values already there, such as SPF.
-            </p>
-          )}
+          <p>
+            The record&rsquo;s full name must be{" "}
+            <span className="text-foreground font-mono">{hostname}</span>
+            {inactive ? null : (
+              <CopyButton
+                value={hostname}
+                label="full name"
+                className="ml-1 -mr-1 size-6 align-middle"
+              />
+            )}
+            . Add it alongside any TXT values already there, such as SPF.
+          </p>
         </div>
       </CardContent>
 

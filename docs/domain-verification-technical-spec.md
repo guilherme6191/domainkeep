@@ -109,7 +109,7 @@ A missing record, a mismatched value, and a resolver timeout are all **successfu
 
 This keeps a large ambiguity out of the client: it never has to decide whether a non-2xx means "your DNS is wrong" or "our server is broken." An expired token is also `200` — the request is rejected before any DNS lookup, and the returned view simply carries `state: "expired"`, which is the state the UI already knows how to render.
 
-`POST /api/claims/:id/verify` is the only route that performs a DNS lookup, and it performs exactly one per request. There is no polling endpoint, no background job, and no scheduled revalidation. The client does not poll either: a lookup happens only when the user clicks **Verify domain** or **Check again**, and the copy explains that DNS can take time rather than treating a missing record as an error.
+`POST /api/claims/:id/verify` is the only route that performs a DNS lookup, and it performs at most one per request. Already-verified claims and expired challenges return without a lookup. There is no polling endpoint, no background job, and no scheduled revalidation. The client does not poll either: a lookup happens only when the user clicks **Verify domain** or **Check again**, and the copy explains that DNS can take time rather than treating a missing record as an error.
 
 ### Errors
 
@@ -144,12 +144,12 @@ Another account's claim returns `404`, never `403`. A `403` would confirm the cl
 
 ### DNS challenge
 
-For `recomendei.me`, the product instructs the user to publish:
+For `example.com`, the product instructs the user to publish:
 
 ```text
 Type:  TXT
 Name:  @
-FQDN:  recomendei.me
+FQDN:  example.com
 Value: resend-verify=<64-character lowercase hexadecimal token>
 TTL:   Auto or provider default
 ```
@@ -160,7 +160,7 @@ The name field shows `@` for every claim, root or subdomain. `@` is not a name b
 
 The alternative was `@` for a root and a computed relative label for a subdomain. It is right more often for the majority case, but it is still a guess about the zone cut, it needs a Public Suffix List the product does not otherwise carry, and it produces `promo.promo.acme.com` for the delegated administrator. Showing `@` everywhere assumes some working knowledge of DNS zones instead. That is an assumption worth making here: the person editing a zone file to prove domain control is not a first-time computer user, and the `record_not_found` checklist names this specific mistake.
 
-The resolver queries that exact normalized domain, with no fallback to the parent: a claim for `news.recomendei.me` queries `news.recomendei.me`. The value the user must publish is composed on the server and returned as `recordValue`; the browser never assembles it.
+The resolver queries that exact normalized domain, with no fallback to the parent: a claim for `news.example.com` queries `news.example.com`. The value the user must publish is composed on the server and returned as `recordValue`; the browser never assembles it.
 
 ### Token generation
 
@@ -246,7 +246,7 @@ Normalization is implemented **once** in shared TypeScript rather than independe
 
 If the user corrects a misspelled domain, `PATCH` **edits the existing row in place**: it writes the new normalized domain, issues a fresh token and expiry, and clears `lastCheck`. The claim keeps its id, so the page the user is on stays the page they are on, and a typo does not leave an abandoned row behind in their domain list.
 
-Editing is refused with `claim_locked` when the claim is verified or superseded. Repointing a verified association at a different domain would grant control the user never proved, and a superseded row carries `verifiedAt` and `supersededAt` that describe the old domain, so an edit would show the new domain as having moved to another account. Only a row that has never verified can be edited, which is why the update touches no history fields. Such a user deletes the claim and adds the correct domain instead; the UI hides the edit control in both cases. If the corrected domain is one the user already has a claim for, the edit is refused as `invalid_domain` with a message saying so, rather than creating a second row that would violate the `(ownerId, normalizedDomain)` constraint.
+Editing is refused with `claim_locked` whenever `verifiedAt` is set, including after a superseded claim receives a fresh challenge. Its proof and history belong to the original domain. Both the UI and the database update use this guard; if verification wins a race with editing, the route reloads the claim and returns `claim_locked`. The user deletes the claim and adds the correct domain instead. If the corrected domain is one the user already has a claim for, the edit is refused as `invalid_domain`, including when a concurrent create or edit wins the race for that name.
 
 ### DNS lookup and matching
 
@@ -292,7 +292,7 @@ function getClaimViewState(claim: DomainClaim, now: Date): ClaimViewState {
 
 `setup_required` means only that the current challenge has not been checked and must not render as an error. `checking` is transient frontend request state and is never persisted.
 
-**List presentation.** The status badge maps the seven states to four labels: `verified` → Verified, `setup_required` → Unchecked, `record_not_found` / `value_mismatch` / `temporary_dns_error` / `expired` → Needs attention, `superseded` → Superseded. The mapping is presentation only, lives in one component, and never feeds back into state derivation; the same badge appears on the detail page beside the panel that names the exact state. The four diagnostic states share one neutral label, not a red "Failed", because a missing record is usually propagation. `superseded` keeps a distinct label because the list is the previous holder's in-app notification of a takeover; the takeover email links to the claim.
+**List presentation.** The status badge maps the seven states to four labels: `verified` → Verified, `setup_required` → Unchecked, `record_not_found` / `value_mismatch` / `temporary_dns_error` / `expired` → Needs attention, `superseded` → Superseded. The mapping is presentation only, lives in one component, and never feeds back into state derivation; the same badge appears on the detail page beside the panel that names the exact state. The four diagnostic states share one neutral label, not a red "Failed", because a missing record may still be propagating. `superseded` keeps a distinct label because the list is the previous holder's in-app notification of a takeover; the takeover email links to the claim.
 
 Verification success is represented by `verifiedAt` together with a null `supersededAt`; it takes precedence over token expiry and does not depend on the TXT record remaining in DNS. A successful verification clears `lastCheck`. No attempt counter or attempt history is persisted.
 
@@ -339,7 +339,7 @@ The transaction performs the transfer; the unique index is the final safety net.
 
 ### Notifying the displaced holder
 
-Losing a domain is the most consequential event in the product, and the list alone only reaches someone who happens to open the app. When a transfer displaces a holder, that account gets one email through Resend.
+Losing a domain is the most consequential event in the product, and the list alone only reaches someone who happens to open the app. When configured, the backend attempts an email through Resend after a transfer displaces a holder. Delivery is best-effort; the superseded claim remains the in-app signal. Durable retries for failed emails are out of scope.
 
 **Trigger.** The route already returns early for a claim that was verified when the request began, so reaching `verify_domain_claim` means this request was a candidate to perform the takeover. A returned row with `tookOverAt` set means it did.
 
@@ -377,7 +377,7 @@ Every outcome maps to one user decision. Messages are product surface, not debug
 | `superseded` | Another account later proved control | Show when it moved and offer a fresh challenge; never identify the winner |
 | Unexpected failure | An outcome cannot be classified | Show the generic API message and request ID; preserve the claim and token for retry |
 
-Starting or failing a competing claim never affects the current association. A successful takeover leaves other pending claims untouched. The previous holder is emailed once, after the response, and finds the superseded claim in the list on the next visit.
+Starting or failing a competing claim never affects the current association. A successful takeover leaves other pending claims untouched. A best-effort email to the previous holder is attempted after the response when configured; regardless of delivery, they find the superseded claim in the list on the next visit.
 
 ### Authorization
 

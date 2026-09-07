@@ -11,7 +11,7 @@ export interface DnsResolver {
   resolveTxt(hostname: string): Promise<TxtLookup>;
 }
 
-// The name exists nowhere or holds no TXT: user-fixable.
+// The lookup found no name or TXT record; propagation or configuration may explain it.
 const NOT_FOUND_CODES = new Set(["ENOTFOUND", "ENODATA", "NXDOMAIN"]);
 
 export const nodeDnsResolver: DnsResolver = {
@@ -26,7 +26,7 @@ export const nodeDnsResolver: DnsResolver = {
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code ?? "";
       if (NOT_FOUND_CODES.has(code)) return { outcome: "not_found" };
-      // SERVFAIL, REFUSED, timeouts: the resolver's problem, never a user error.
+      // SERVFAIL, REFUSED, timeouts: an incomplete lookup does not prove the TXT value is wrong.
       return { outcome: "temporary_failure" };
     }
   },

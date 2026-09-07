@@ -75,7 +75,7 @@ Supabase provides the Postgres database. A free project is enough.
 | `DIRECT_URL` | Supabase → Connect → ORMs → Prisma, session pooler (5432). Migrations only. |
 | `RESEND_API_KEY` | Resend dashboard → API Keys. Optional: without it the takeover email is skipped. Server only. |
 | `RESEND_FROM` | An address on a domain verified in your Resend account. `onboarding@resend.dev` works but only delivers to your own address. |
-| `NEXT_PUBLIC_APP_URL` | Base for the link in the takeover email. Defaults to the request origin locally. |
+| `NEXT_PUBLIC_APP_URL` | Base for the link in the takeover email. Defaults to the request origin locally; the deployment sets it to `https://domainkeep-lm3sjdv4g-guilherme6191s-projects.vercel.app`. |
 
 `.env.local` is git-ignored. Never commit the filled-in file.
 

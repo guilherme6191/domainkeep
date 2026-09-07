@@ -72,10 +72,10 @@ function PropagationNote({ buttonLabel }: { buttonLabel: string }) {
 
 export function ClaimDetail({ claimId }: { claimId: string }) {
   const router = useRouter();
-  const { data: claim, isPending, isError } = useClaim(claimId);
+  const { data: claim, isPending, isError, error, refetch, isFetching } =
+    useClaim(claimId);
   const verify = useVerifyClaim(claimId);
   const replaceToken = useReplaceToken(claimId);
-
 
   if (isPending) {
     return (
@@ -88,9 +88,25 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   }
 
   if (isError || !claim) {
+    const notFound =
+      error instanceof ApiRequestError && error.code === "not_found";
     return (
       <div className="space-y-4">
-        <p className="text-sm">We couldn&rsquo;t find that domain.</p>
+        <p className="text-sm" role="alert">
+          {notFound
+            ? "We couldn't find that domain."
+            : "We couldn't load this domain. Try again."}
+        </p>
+        {!notFound && error instanceof ApiRequestError && error.requestId ? (
+          <p className="text-muted-foreground text-sm">
+            Reference: {error.requestId}
+          </p>
+        ) : null}
+        {!notFound ? (
+          <Button size="sm" onClick={() => void refetch()} disabled={isFetching}>
+            {isFetching ? "Retrying…" : "Retry"}
+          </Button>
+        ) : null}
         <Link
           href="/domains"
           className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -204,7 +220,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
               />
             </span>
             <StatusBadge state={claim.state} />
-            {isVerified || claim.state === "superseded" ? null : (
+            {claim.verifiedAt !== null ? null : (
               <EditDomainDialog claimId={claim.id} domain={claim.domain} />
             )}
           </div>

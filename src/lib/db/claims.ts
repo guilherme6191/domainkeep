@@ -172,6 +172,9 @@ export async function updateClaimDomain(input: {
       })
       .eq("id", input.id)
       .eq("owner_id", input.ownerId)
+      // Verification may have completed after the route's initial read.
+      // Never move its proof or history to a different domain.
+      .is("verified_at", null)
       .select(COLUMNS)
       .maybeSingle<ClaimRow>(),
   );

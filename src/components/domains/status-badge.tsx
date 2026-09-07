@@ -12,8 +12,8 @@ type Presentation = {
 // nothing, start, open and fix, or open and learn the domain moved. Every
 // pending-with-a-fix state shares one "Needs attention" label. The detail page
 // names the exact state.
-// Amber means "open this", never "failed": three of the four states behind it
-// are usually propagation, not a mistake.
+// Amber means "open this", not proof of a mistake: the cause may be propagation,
+// a configuration issue, a lookup failure, or an expired challenge.
 const NEEDS_ATTENTION: Presentation = {
   label: "Needs attention",
   variant: "outline",

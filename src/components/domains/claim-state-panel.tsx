@@ -61,9 +61,8 @@ function RecordNotFound({ claim }: { claim: ClaimView }) {
         </div>
 
         <p>
-          If everything above looks right, it&rsquo;s almost certainly
-          propagation. Check again in a few minutes, now or later — your code
-          stays valid and retrying is free.
+          If everything above looks right, allow more time for DNS changes and
+          check again in a few minutes. Retrying does not change your code.
         </p>
       </AlertDescription>
     </Alert>
@@ -181,9 +180,8 @@ function TemporaryDnsError() {
         DNS didn&rsquo;t respond. Your record may still be correct.
       </AlertTitle>
       <AlertDescription>
-        This is a problem on the lookup side, not your configuration.
-        There&rsquo;s nothing to change — click Check again to retry, and this
-        page will keep retrying for a few minutes after you do.
+        We couldn&rsquo;t complete the lookup. There&rsquo;s nothing to change
+        yet — click Check again to retry.
       </AlertDescription>
     </Alert>
   );

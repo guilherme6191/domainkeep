@@ -86,8 +86,14 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
   vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
   recordCheckFailure.mockImplementation(
-    async ({ result }: { result: LastCheckResult }) =>
-      record({ lastCheck: { result, checkedAt: NOW } as never }),
+    async ({ result, observedValues }: {
+      result: LastCheckResult;
+      observedValues: string[] | null;
+    }) => record({
+      lastCheck: result === "value_mismatch"
+        ? { result, observedValues: observedValues ?? [], checkedAt: NOW }
+        : { result, checkedAt: NOW },
+    }),
   );
   fakeDns({ outcome: "not_found" });
 });
@@ -187,6 +193,12 @@ describe("POST /api/claims/:id/verify", () => {
     // A negative result is a successful check, not a failed request.
     expect(response.status).toBe(200);
     expect(body.state).toBe(expected);
+    if (expected === "value_mismatch") {
+      expect(body.lastCheck).toMatchObject({
+        result: "value_mismatch",
+        observedValues: ["resend-verify=something-else"],
+      });
+    }
     expect(verifyClaimAtomically).not.toHaveBeenCalled();
   });
 

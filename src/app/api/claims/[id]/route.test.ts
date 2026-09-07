@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ClaimRecord } from "@/lib/db/claims";
+import { PostgrestError } from "@supabase/supabase-js";
+import { DatabaseError, type ClaimRecord } from "@/lib/db/claims";
 import type { ApiError, ClaimView } from "@/lib/types";
 
 const SESSION_USER = "user_owner";
@@ -107,5 +108,76 @@ describe("PATCH /api/claims/:id", () => {
     expect(response.status).toBe(409);
     expect(body.error.code).toBe("claim_locked");
     expect(updateClaimDomain).not.toHaveBeenCalled();
+  });
+
+  it("still refuses editing after a superseded claim gets a fresh token", async () => {
+    getClaim.mockResolvedValue(
+      record({ verifiedAt: YESTERDAY, supersededAt: NOW, tokenExpiresAt: IN_A_WEEK }),
+    );
+
+    const response = await patch("example.com");
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("claim_locked");
+    expect(updateClaimDomain).not.toHaveBeenCalled();
+  });
+
+  it("returns a locked response when verification wins the race with editing", async () => {
+    getClaim
+      .mockResolvedValueOnce(record())
+      .mockResolvedValueOnce(record({ verifiedAt: NOW }));
+    updateClaimDomain.mockResolvedValue(null);
+
+    const response = await patch("example.com");
+    const body = (await response.json()) as ApiError;
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("claim_locked");
+    expect(body.error.message).toContain("already verified");
+    expect(getClaim).toHaveBeenLastCalledWith(CLAIM_ID, SESSION_USER);
+    expect(updateClaimDomain).toHaveBeenCalledOnce();
+  });
+
+  it("returns 404 when deletion wins the race with editing", async () => {
+    getClaim.mockResolvedValueOnce(record()).mockResolvedValueOnce(null);
+    updateClaimDomain.mockResolvedValue(null);
+
+    const response = await patch("example.com");
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.code).toBe("not_found");
+  });
+
+  it("returns the normal duplicate message when another create wins the race", async () => {
+    getClaim.mockResolvedValue(record());
+    findClaimByDomain
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(record({ id: "another-claim", normalizedDomain: "example.com" }));
+    updateClaimDomain.mockRejectedValue(new DatabaseError(new PostgrestError({
+      code: "23505", message: "unique constraint violation", details: "", hint: "",
+    })));
+
+    const response = await patch("example.com");
+    const body = (await response.json()) as ApiError;
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("invalid_domain");
+    expect(body.error.message).toBe("You've already added that domain. Open it from your domains list.");
+    expect(findClaimByDomain).toHaveBeenLastCalledWith(SESSION_USER, "example.com");
+  });
+
+  it("does not describe an unconfirmed uniqueness failure as an owned duplicate", async () => {
+    getClaim.mockResolvedValue(record());
+    updateClaimDomain.mockRejectedValue(new DatabaseError(new PostgrestError({
+      code: "23505", message: "unique constraint violation", details: "", hint: "",
+    })));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await patch("example.com");
+      expect(response.status).toBe(500);
+      expect((await response.json()).error.code).toBe("internal_error");
+    } finally {
+      logged.mockRestore();
+    }
   });
 });

@@ -90,7 +90,7 @@ The transfer flow is inspired by [Resend Domain Claim](https://resend.com/docs/d
 
 ## User flow and feedback
 
-Enter a domain (e.g. `example.com`), publish the supplied TXT record, and click **Verify domain**. The instructions show type, name (`@`), required full hostname, value, and TTL. Copy failures offer manual selection; failed deletion shows an error toast. A DNS check returns success or a diagnosis with a next action. Users can correct DNS and retry with the same code, or deliberately replace it and publish the new value.
+Enter a domain (e.g. `example.com`), publish the supplied TXT record, and click **Verify domain**. The instructions show type, name (`@` for a root, the relative label for a subdomain), required full hostname, value, and TTL. Copy failures offer manual selection; failed deletion shows an error toast. A DNS check returns success or a diagnosis with a next action. Users can correct DNS and retry with the same code, or deliberately replace it and publish the new value.
 
 The list groups outcomes by next action; the detail page gives the diagnosis. The spec owns the [state ladder](domain-verification-technical-spec.md#state-behavior) and [field transitions](domain-verification-technical-spec.md#reassignment-and-atomicity).
 

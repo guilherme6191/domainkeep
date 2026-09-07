@@ -123,6 +123,28 @@ export function verificationHostname(domain: string): string {
   return domain;
 }
 
+/**
+ * The last two labels, or three when the last two are a known public suffix.
+ * Same pragmatic list as `normalizeDomain`, with the same limits.
+ */
+export function registrableDomain(domain: string): string {
+  const labels = domain.split(".");
+  const lastTwo = labels.slice(-2).join(".");
+  const keep = PUBLIC_SUFFIXES.has(lastTwo) ? 3 : 2;
+  return labels.slice(-keep).join(".");
+}
+
+/**
+ * What goes in the provider's Name field: `@` for a root, otherwise the labels
+ * before the registrable domain (`news` for `news.example.com`). Presentation
+ * only; the record is still queried at the full name.
+ */
+export function recordName(domain: string): string {
+  const root = registrableDomain(domain);
+  if (domain === root) return "@";
+  return domain.slice(0, -(root.length + 1));
+}
+
 /** What the user publishes: the prefix is what makes the value findable at a
  * name that already carries SPF and other verifiers. */
 export function verificationRecordValue(token: string): string {

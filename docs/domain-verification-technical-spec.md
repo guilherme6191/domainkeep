@@ -142,7 +142,17 @@ TTL:   Auto or provider default
 
 The backend composes `recordValue` and queries the exact normalized hostname, with no parent fallback. The prefix distinguishes this proof from unrelated TXT records; instructions say to add beside existing values, never replace them. A name already carrying a CNAME cannot also carry TXT.
 
-The name field shows `@` alongside the required full hostname. `@` means the apex of the zone being edited, which the app cannot infer. For `news.example.com`, someone editing the `example.com` zone enters `news`; someone editing a delegated `news.example.com` zone enters `@`.
+The Name field shows the claimed name relative to its registrable domain, which is what most providers expect in that field, alongside the required full hostname:
+
+| Claimed name | Name |
+| --- | --- |
+| `example.com` | `@` |
+| `news.example.com` | `news` |
+| `a.b.example.com` | `a.b` |
+| `example.co.uk` | `@` |
+| `shop.example.co.uk` | `shop` |
+
+The registrable domain is the last two labels, or three when the last two are in the same pragmatic public-suffix set `normalizeDomain` uses. The one case this does not fit is a delegated zone whose root is the subdomain itself, where `@` is right; the Name popover covers it, and the full-hostname line under the table is the invariant to check against.
 
 The full value remains selectable text even when visually truncated. The copy action uses the complete value; clipboard failure shows a toast directing the user to select it manually.
 
@@ -342,7 +352,7 @@ Every outcome maps to one user decision. Messages are product surface, not debug
 | Outcome | Condition | User guidance and recovery |
 | --- | --- | --- |
 | Invalid input | The submitted value is not eligible | Explain the specific problem; issue no challenge |
-| `record_not_found` | No `resend-verify=` value is visible at the name, whatever else is | Check the value carries the prefix, check `@` resolved to the intended zone rather than a parent, check the name is not a CNAME, wait, and retry with the same token; never assert misconfiguration |
+| `record_not_found` | No `resend-verify=` value is visible at the name, whatever else is | Check the value carries the prefix, check the record's full name is the claimed name rather than the zone root or a sibling, check the name is not a CNAME, wait, and retry with the same token; never assert misconfiguration |
 | `value_mismatch` | `resend-verify=` values exist but none exactly matches | Show bounded expected and observed values, prefixed values only, correct DNS, and retry with the same token |
 | `temporary_dns_error` | The resolver times out, refuses, or temporarily fails | Say the record may be correct and retry without changing DNS |
 | `expired` | Seven days elapsed on a pending challenge | Deliberately generate a replacement and explain that the old value is invalid |

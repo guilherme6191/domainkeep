@@ -9,9 +9,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { recordName } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
-const COLUMNS = "sm:grid-cols-[5rem_4rem_1fr_4rem]";
+const COLUMNS = "sm:grid-cols-[5rem_8rem_1fr_4rem]";
 
 // Provider-style table on `sm` and up; labels move inline on phones.
 function Cell({
@@ -31,7 +32,8 @@ function Cell({
   );
 }
 
-// The `@` explanation lives where the question comes up, not under the table.
+// The Name explanation lives where the question comes up, not under the table.
+// One paragraph covers `@`, a relative label, and a delegated zone.
 function NameHelp({ hostname }: { hostname: string }) {
   return (
     <Popover>
@@ -41,7 +43,7 @@ function NameHelp({ hostname }: { hostname: string }) {
             variant="ghost"
             size="icon"
             className="text-muted-foreground size-6 shrink-0"
-            aria-label="What does @ mean?"
+            aria-label="What goes in the Name field?"
           />
         }
       >
@@ -49,10 +51,15 @@ function NameHelp({ hostname }: { hostname: string }) {
       </PopoverTrigger>
       <PopoverContent className="font-sans">
         <p>
-          <span className="text-foreground font-mono">@</span> is the root of
-          the zone you&rsquo;re editing. If you&rsquo;re editing a parent zone,
-          enter the part before it instead, so the record&rsquo;s full name ends
-          up as{" "}
+          Name is what your DNS provider calls the host.{" "}
+          <span className="text-foreground font-mono">@</span> means the root
+          of the zone you&rsquo;re editing, and{" "}
+          <span className="text-foreground font-mono">news</span> means{" "}
+          <span className="text-foreground font-mono">news</span> under that
+          root. If the name you&rsquo;re claiming is itself the root of the
+          zone you&rsquo;re editing, use{" "}
+          <span className="text-foreground font-mono">@</span>. Either way,
+          the record&rsquo;s full name must end up as{" "}
           <span className="text-foreground font-mono break-words">{hostname}</span>
           .
         </p>
@@ -78,6 +85,8 @@ export function DnsRecordCard({
   inactive?: boolean;
   footer?: React.ReactNode;
 }) {
+  const name = recordName(hostname);
+
   return (
     <Card>
       <CardHeader className={cn(inactive && "opacity-40")}>
@@ -104,10 +113,15 @@ export function DnsRecordCard({
             <Cell label="Type">TXT</Cell>
             <Cell label="Name">
               <span className="flex items-center gap-1">
-                <span className={cn(inactive && "line-through")}>@</span>
+                <span
+                  className={cn("min-w-0 truncate", inactive && "line-through")}
+                  title={name}
+                >
+                  {name}
+                </span>
                 {inactive ? null : (
                   <>
-                    <CopyButton value="@" label="name" className="size-6 shrink-0" />
+                    <CopyButton value={name} label="name" className="size-6 shrink-0" />
                     <NameHelp hostname={hostname} />
                   </>
                 )}

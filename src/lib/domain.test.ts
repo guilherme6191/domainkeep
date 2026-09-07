@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   normalizeDomain,
+  recordName,
   verificationHostname,
   verificationRecordValue,
 } from "@/lib/domain";
@@ -51,5 +52,15 @@ describe("normalizeDomain", () => {
     expect(verificationRecordValue("a".repeat(64))).toBe(
       `resend-verify=${"a".repeat(64)}`,
     );
+  });
+
+  it.each([
+    ["example.com", "@"],
+    ["news.example.com", "news"],
+    ["a.b.example.com", "a.b"],
+    ["example.co.uk", "@"],
+    ["shop.example.co.uk", "shop"],
+  ])("shows the Name for %s relative to its root as %s", (domain, name) => {
+    expect(recordName(domain)).toBe(name);
   });
 });

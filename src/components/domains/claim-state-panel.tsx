@@ -52,8 +52,8 @@ function RecordNotFound({ claim }: { claim: ClaimView }) {
             </li>
             <li>The value was pasted, not retyped.</li>
             <li>
-              The full name is exactly <Mono>{claim.domain}</Mono>. In a parent
-              zone, <Mono>@</Mono> publishes at the parent instead.
+              The record&rsquo;s full name is exactly <Mono>{claim.domain}</Mono>,
+              not the root of the zone and not a sibling.
             </li>
             <li>
               The type is TXT. A name that is already a CNAME can&rsquo;t carry

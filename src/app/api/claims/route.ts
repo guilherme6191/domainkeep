@@ -3,14 +3,16 @@ import { z } from "zod";
 import { apiError, internalError } from "@/lib/api/errors";
 import { currentUserId } from "@/lib/api/session";
 import { toClaimView } from "@/lib/api/view";
+import { isClaimId } from "@/lib/api/params";
 import {
   DatabaseError,
+  deleteClaims,
   findClaimByDomain,
   insertClaim,
   listClaims,
 } from "@/lib/db/claims";
 import { normalizeDomain } from "@/lib/domain";
-import { parsePage, parsePageSize } from "@/lib/pagination";
+import { PAGE_SIZES, parsePage, parsePageSize } from "@/lib/pagination";
 import { createVerificationToken, tokenExpiryFrom } from "@/lib/token";
 import type { ClaimPage } from "@/lib/types";
 
@@ -86,5 +88,28 @@ export async function POST(request: Request) {
     }
 
     return internalError("POST /api/claims", error);
+  }
+}
+
+// The UI can only select what it shows, so the largest page bounds a request.
+const deleteBody = z.object({
+  ids: z.array(z.string()).min(1).max(Math.max(...PAGE_SIZES)),
+});
+
+export async function DELETE(request: Request) {
+  const ownerId = await currentUserId();
+  if (!ownerId) return apiError("unauthenticated", "Sign in to continue.");
+
+  // Any body is answerable: an id that cannot exist is reported the same way as
+  // one belonging to another account — absent from `deleted`, never an error.
+  const parsed = deleteBody.safeParse(await request.json().catch(() => null));
+  const ids = parsed.success ? parsed.data.ids.filter(isClaimId) : [];
+  if (ids.length === 0) return NextResponse.json({ deleted: [] });
+
+  try {
+    const deleted = await deleteClaims(ids, ownerId);
+    return NextResponse.json({ deleted });
+  } catch (error) {
+    return internalError("DELETE /api/claims", error);
   }
 }

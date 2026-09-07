@@ -11,7 +11,7 @@ vi.mock("@/lib/db/client", async () => {
   return { dbAdmin: () => client, db: () => client };
 });
 
-const { listClaims, updateClaimDomain } = await import("@/lib/db/claims");
+const { deleteClaims, listClaims, updateClaimDomain } = await import("@/lib/db/claims");
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -70,3 +70,24 @@ describe("listClaims", () => {
     expect(String(new Headers(init?.headers).get("prefer"))).toContain("count=exact");
   });
 });
+
+describe("deleteClaims", () => {
+  it("filters by owner and reports only the rows the database removed", async () => {
+    fetchMock.mockResolvedValue(new Response('[{"id":"claim-a"}]', {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+
+    const deleted = await deleteClaims(["claim-a", "claim-b"], "user-owner");
+
+    // Never the requested ids: one belonged to someone else or was already gone.
+    expect(deleted).toEqual(["claim-a"]);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0];
+    const query = new URL(String(url)).searchParams;
+    expect(init?.method).toBe("DELETE");
+    expect(query.get("id")).toBe("in.(claim-a,claim-b)");
+    expect(query.get("owner_id")).toBe("eq.user-owner");
+  });
+});
+

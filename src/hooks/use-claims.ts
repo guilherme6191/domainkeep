@@ -47,7 +47,7 @@ function replaceClaim(page: ClaimPage | undefined, claim: ClaimView) {
 }
 
 /** Drops rows from every cached page and keeps `total` honest. */
-export function evictClaims(queryClient: QueryClient, ids: string[]) {
+function evictClaims(queryClient: QueryClient, ids: string[]) {
   for (const id of ids) queryClient.removeQueries({ queryKey: claimKey(id) });
 
   queryClient.setQueriesData<ClaimPage>({ queryKey: claimListPrefix }, (page) => {
@@ -55,6 +55,19 @@ export function evictClaims(queryClient: QueryClient, ids: string[]) {
     // The rows are gone everywhere, so every cached page's total drops.
     const items = page.items.filter((claim) => !ids.includes(claim.id));
     return { ...page, items, total: Math.max(0, page.total - ids.length) };
+  });
+}
+
+/**
+ * A page short a row is not the page the server would send, so a mounted list
+ * refetches. Nothing is mounted while the detail page navigates back to the
+ * list, so no response can land mid-flight there.
+ */
+function settleDelete(queryClient: QueryClient, ids: string[]) {
+  evictClaims(queryClient, ids);
+  void queryClient.invalidateQueries({
+    queryKey: claimsKey,
+    refetchType: "active",
   });
 }
 
@@ -131,18 +144,23 @@ export function useDeleteClaim(options?: { onSuccess?: () => void }) {
   return useMutation({
     mutationFn: (id: string) => claimsApi.remove(id),
     onSuccess: (_data, id) => {
-      // Deleting from the detail page returns to the list, which must not paint
-      // the removed row first.
-      evictClaims(queryClient, [id]);
-      // A page short one row is not the page the server would send, so a
-      // mounted list refetches. Nothing is mounted during the detail-page
-      // navigation, so no response can land mid-flight there.
-      void queryClient.invalidateQueries({
-        queryKey: claimsKey,
-        refetchType: "active",
-      });
-
+      settleDelete(queryClient, [id]);
       options?.onSuccess?.();
+    },
+  });
+}
+
+export function useDeleteClaims(options?: {
+  onSuccess?: (deleted: string[]) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => claimsApi.removeMany(ids),
+    // Only the ids the database actually removed leave the cache.
+    onSuccess: ({ deleted }) => {
+      settleDelete(queryClient, deleted);
+      options?.onSuccess?.(deleted);
     },
   });
 }

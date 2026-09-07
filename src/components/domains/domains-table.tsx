@@ -6,6 +6,7 @@ import { DeleteDomainDialog } from "@/components/domains/delete-domain-dialog";
 import { StatusBadge } from "@/components/domains/status-badge";
 import { TablePagination } from "@/components/domains/table-pagination";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -35,16 +36,45 @@ function LastCheckedCell({ iso }: { iso: string | null }) {
   );
 }
 
-export function DomainsTable({ page }: { page: ClaimPage }) {
+export function DomainsTable({
+  page,
+  selected,
+  onSelectedChange,
+}: {
+  page: ClaimPage;
+  selected: ReadonlySet<string>;
+  onSelectedChange: (selected: ReadonlySet<string>) => void;
+}) {
   const claims = page.items;
   const pageSize = page.pageSize as PageSize;
   const pageCount = Math.max(1, Math.ceil(page.total / pageSize));
+  const selectedHere = claims.filter((claim) => selected.has(claim.id)).length;
+
+  // Selection is scoped to the page, so "all" means all of the rows on screen.
+  function toggleAll(checked: boolean) {
+    onSelectedChange(new Set(checked ? claims.map((claim) => claim.id) : []));
+  }
+
+  function toggleOne(id: string, checked: boolean) {
+    const next = new Set(selected);
+    if (checked) next.add(id);
+    else next.delete(id);
+    onSelectedChange(next);
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8">
+              <Checkbox
+                checked={selectedHere > 0 && selectedHere === claims.length}
+                indeterminate={selectedHere > 0 && selectedHere < claims.length}
+                onCheckedChange={toggleAll}
+                aria-label="Select all on this page"
+              />
+            </TableHead>
             <TableHead>Domain</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last checked</TableHead>
@@ -56,7 +86,17 @@ export function DomainsTable({ page }: { page: ClaimPage }) {
         </TableHeader>
         <TableBody>
           {claims.map((claim) => (
-            <TableRow key={claim.id}>
+            <TableRow
+              key={claim.id}
+              data-state={selected.has(claim.id) ? "selected" : undefined}
+            >
+              <TableCell>
+                <Checkbox
+                  checked={selected.has(claim.id)}
+                  onCheckedChange={(checked) => toggleOne(claim.id, checked)}
+                  aria-label={`Select ${claim.domain}`}
+                />
+              </TableCell>
               <TableCell className="font-mono">
                 <Link
                   href={`/domains/${claim.id}`}

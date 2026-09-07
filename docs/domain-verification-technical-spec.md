@@ -85,6 +85,7 @@ A domain held elsewhere produces the same creation response and DNS diagnoses as
 | `POST /api/claims/:id/verify` | `200` | — | `ClaimView` |
 | `POST /api/claims/:id/replace-token` | `200` | — | `ClaimView` |
 | `DELETE /api/claims/:id` | `204` | — | — |
+| `DELETE /api/claims` | `200` | `{ ids: string[] }` | `{ deleted: string[] }` |
 
 A page past the end returns an empty `items` with the true `total`; the client clamps its own URL rather than being redirected. A malformed `page` or an unoffered `pageSize` is read as the default rather than rejected.
 
@@ -329,6 +330,8 @@ The seven-day limit prevents abandoned challenges from remaining usable indefini
 ### Releasing a domain
 
 `DELETE /api/claims/:id` hard-deletes the caller's row and token. Deleting the active claim releases the domain immediately; it does not modify DNS, and the leftover TXT value is inert because its token no longer exists. The UI confirms deletion and explains that the association will end.
+
+`DELETE /api/claims` applies that same hard delete to each id in one owner-filtered statement, and answers with the ids it actually removed. An id belonging to another account, an id that no longer exists, and a malformed id are all simply absent from `deleted` — the same non-disclosure as the single route's "404, never 403". A body with no usable ids is answered with an empty `deleted` rather than an error, as is one carrying more than 120 ids — the largest page, and so the most the UI can select — which is rejected whole rather than truncated, so a caller is never told it deleted a prefix of what it asked for.
 
 ### Failure classification
 

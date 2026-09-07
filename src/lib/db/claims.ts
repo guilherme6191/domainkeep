@@ -268,6 +268,23 @@ export async function deleteClaim(id: string, ownerId: string): Promise<boolean>
   return rows.length > 0;
 }
 
+/** Hard delete of many rows; unowned and already-gone ids are simply absent. */
+export async function deleteClaims(
+  ids: string[],
+  ownerId: string,
+): Promise<string[]> {
+  const rows = unwrap(
+    await dbAdmin()
+      .from(TABLE)
+      .delete()
+      .in("id", ids)
+      .eq("owner_id", ownerId)
+      .select("id")
+      .returns<{ id: string }[]>(),
+  );
+  return rows.map((row) => row.id);
+}
+
 /**
  * Claims a notification attempt for the holder this takeover displaced.
  *

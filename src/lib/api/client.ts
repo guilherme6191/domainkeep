@@ -53,4 +53,9 @@ export const claimsApi = {
     request<ClaimView>(`/api/claims/${id}/replace-token`, { method: "POST" }),
   remove: (id: string) =>
     request<void>(`/api/claims/${id}`, { method: "DELETE" }),
+  removeMany: (ids: string[]) =>
+    request<{ deleted: string[] }>("/api/claims", {
+      method: "DELETE",
+      body: JSON.stringify({ ids }),
+    }),
 };

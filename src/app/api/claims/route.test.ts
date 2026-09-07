@@ -11,6 +11,7 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: async () => ({ userId: sessionUserId }),
 }));
 
+const deleteClaims = vi.fn<(ids: string[], ownerId: string) => Promise<string[]>>();
 const listClaims = vi.fn<
   (ownerId: string, page: number, pageSize: number) => Promise<{ records: ClaimRecord[]; total: number }>
 >();
@@ -20,19 +21,33 @@ vi.mock("@/lib/db/claims", async (importOriginal) => {
   return {
     ...actual,
     listClaims: (...args: Parameters<typeof listClaims>) => listClaims(...args),
+    deleteClaims: (...args: Parameters<typeof deleteClaims>) => deleteClaims(...args),
   };
 });
 
-const { GET } = await import("@/app/api/claims/route");
+const { DELETE, GET } = await import("@/app/api/claims/route");
+
+const ID_A = "6f1a2b3c-4d5e-4f60-8a9b-0c1d2e3f4a5b";
+const ID_B = "7a2b3c4d-5e6f-4071-9b0c-1d2e3f4a5b6c";
 
 function get(query = "") {
   return GET(new Request(`http://localhost/api/claims${query}`));
+}
+
+function del(body: unknown) {
+  return DELETE(
+    new Request("http://localhost/api/claims", {
+      method: "DELETE",
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    }),
+  );
 }
 
 beforeEach(() => {
   sessionUserId = SESSION_USER;
   listClaims.mockReset();
   listClaims.mockResolvedValue({ records: [], total: 83 });
+  deleteClaims.mockReset();
 });
 
 describe("GET /api/claims", () => {
@@ -62,5 +77,38 @@ describe("GET /api/claims", () => {
     expect(response.status).toBe(401);
     expect(((await response.json()) as ApiError).error.code).toBe("unauthenticated");
     expect(listClaims).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/claims", () => {
+  it("deletes the well-formed ids and reports back what the database removed", async () => {
+    deleteClaims.mockResolvedValue([ID_A]);
+
+    const response = await del({ ids: [ID_A, ID_B, "not-an-id"] });
+
+    // Malformed ids never reach the query, and someone else's id is simply absent.
+    expect(deleteClaims).toHaveBeenCalledWith([ID_A, ID_B], SESSION_USER);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ deleted: [ID_A] });
+  });
+
+  it("answers an unusable body with an empty deletion rather than an error", async () => {
+    const bodies = [{ ids: [] }, { ids: ["not-an-id"] }, { ids: Array(121).fill(ID_A) }, {}, "{"];
+
+    for (const body of bodies) {
+      const response = await del(body);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ deleted: [] });
+    }
+    expect(deleteClaims).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unauthenticated caller", async () => {
+    sessionUserId = null;
+
+    const response = await del({ ids: [ID_A] });
+
+    expect(response.status).toBe(401);
+    expect(deleteClaims).not.toHaveBeenCalled();
   });
 });

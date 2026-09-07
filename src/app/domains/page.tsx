@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { AddDomainDialog } from "@/components/domains/add-domain-dialog";
 import { AddDomainForm } from "@/components/domains/add-domain-form";
+import { DeleteDomainsDialog } from "@/components/domains/delete-domains-dialog";
+import { DomainsActionsMenu } from "@/components/domains/domains-actions-menu";
 import { DomainsTable } from "@/components/domains/domains-table";
 import { AppHeader } from "@/components/app-header";
 import {
@@ -25,8 +28,17 @@ export default function DomainsPage() {
   const page = parsePage(searchParams.get("page"));
   const pageSize = parsePageSize(searchParams.get("pageSize"));
 
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const { data, isPending, isError, isPlaceholderData } = useClaims(page, pageSize);
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+
+  // Selection belongs to the rows on screen, so it is narrowed to them rather
+  // than stored that way: a page change or a row deleted elsewhere drops out on
+  // its own, with no state to keep in step.
+  const selectedClaims = data?.items.filter((claim) => selected.has(claim.id)) ?? [];
+  const selectedHere = new Set(selectedClaims.map((claim) => claim.id));
 
   // Deleting the last row of the last page leaves the URL past the end.
   useEffect(() => {
@@ -70,12 +82,34 @@ export default function DomainsPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-semibold tracking-tight">Domains</h1>
-              <AddDomainDialog />
+              <div className="flex items-center gap-2">
+                <AddDomainDialog />
+                <DomainsActionsMenu
+                  selectedCount={selectedHere.size}
+                  onDeleteSelected={() => setConfirmOpen(true)}
+                />
+              </div>
             </div>
             {/* Dimmed, not replaced: the previous page stays put while the next loads. */}
             <div className={isPlaceholderData ? "opacity-60 transition-opacity" : undefined}>
-              <DomainsTable page={data} />
+              <DomainsTable
+                page={data}
+                selected={selectedHere}
+                onSelectedChange={setSelected}
+              />
             </div>
+
+            <DeleteDomainsDialog
+              claims={selectedClaims}
+              open={confirmOpen}
+              onOpenChange={setConfirmOpen}
+              onDeleted={(deleted) => {
+                setSelected(new Set());
+                toast.success(
+                  `${deleted.length} ${deleted.length === 1 ? "domain" : "domains"} deleted.`,
+                );
+              }}
+            />
           </div>
         )}
       </main>

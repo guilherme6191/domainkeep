@@ -12,6 +12,11 @@ const TABLE = "domain_claims";
 
 const COLUMNS = "*";
 
+// The negation of `is_currently_verified` in PostgREST filter syntax. Writes that
+// only make sense on a pending claim carry it so the database, not a read
+// made moments earlier, decides whether the claim is still pending.
+const NOT_CURRENTLY_VERIFIED = "verified_at.is.null,superseded_at.not.is.null";
+
 /** As the Data API returns it: timestamps are ISO strings. */
 interface ClaimRow {
   id: string;
@@ -240,6 +245,9 @@ export async function replaceToken(input: {
       })
       .eq("id", input.id)
       .eq("owner_id", input.ownerId)
+      // Nothing to prove on a currently verified claim; a check may have
+      // completed after the route decided this one was still pending.
+      .or(NOT_CURRENTLY_VERIFIED)
       .select(COLUMNS)
       .maybeSingle<ClaimRow>(),
   );
@@ -268,6 +276,8 @@ export async function recordCheckFailure(input: {
       // The challenge may have been replaced or its domain edited while DNS
       // was in flight. Never attach token A's result to token B.
       .eq("verification_token", input.expectedToken)
+      // And never write a failure over a proof that landed while it ran.
+      .or(NOT_CURRENTLY_VERIFIED)
       .select(COLUMNS)
       .maybeSingle<ClaimRow>(),
   );

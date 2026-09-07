@@ -36,7 +36,13 @@ export async function POST(_request: Request, { params }: Context) {
       token: createVerificationToken(),
       tokenExpiresAt: tokenExpiryFrom(now),
     });
-    if (!updated) return apiError("not_found", NOT_FOUND_MESSAGE);
+    if (!updated) {
+      // The write refuses a claim that verified after the read above, or one
+      // that was deleted. Show whichever is now true.
+      const current = await getClaim(id, ownerId);
+      if (!current) return apiError("not_found", NOT_FOUND_MESSAGE);
+      return NextResponse.json(toClaimView(current));
+    }
 
     return NextResponse.json(toClaimView(updated, now));
   } catch (error) {

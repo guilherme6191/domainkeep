@@ -11,7 +11,8 @@ vi.mock("@/lib/db/client", async () => {
   return { dbAdmin: () => client, db: () => client };
 });
 
-const { deleteClaims, listClaims, updateClaimDomain } = await import("@/lib/db/claims");
+const { deleteClaims, listClaims, recordCheckFailure, replaceToken, updateClaimDomain } =
+  await import("@/lib/db/claims");
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -109,5 +110,61 @@ describe("listClaims past the last page", () => {
     expect(total).toBe(5);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1][1]?.method).toBe("HEAD");
+  });
+});
+
+// Both writes only make sense on a pending claim, so they carry the negation of
+// `is_currently_verified` and let the database refuse a claim that verified
+// after the route's read. A superseded claim (verified once, then displaced)
+// still passes, because it is exactly the one that needs a new challenge.
+describe("writes that require a pending claim", () => {
+  const NOT_CURRENTLY_VERIFIED = "(verified_at.is.null,superseded_at.not.is.null)";
+
+  function refused() {
+    fetchMock.mockResolvedValue(new Response("[]", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+  }
+
+  it("replaceToken refuses a claim that is currently verified", async () => {
+    refused();
+
+    const result = await replaceToken({
+      id: "claim-id",
+      ownerId: "user-owner",
+      token: "b".repeat(64),
+      tokenExpiresAt: new Date("2026-09-14T00:00:00Z"),
+    });
+
+    expect(result).toBeNull();
+    const [url, init] = fetchMock.mock.calls[0];
+    const query = new URL(String(url)).searchParams;
+    expect(init?.method).toBe("PATCH");
+    expect(query.get("id")).toBe("eq.claim-id");
+    expect(query.get("owner_id")).toBe("eq.user-owner");
+    expect(query.get("or")).toBe(NOT_CURRENTLY_VERIFIED);
+  });
+
+  it("recordCheckFailure never writes a failure over a proof that landed meanwhile", async () => {
+    refused();
+
+    const result = await recordCheckFailure({
+      id: "claim-id",
+      ownerId: "user-owner",
+      expectedToken: "a".repeat(64),
+      result: "record_not_found",
+      observedValues: null,
+      checkedAt: new Date("2026-09-07T00:00:00Z"),
+    });
+
+    expect(result).toBeNull();
+    const [url, init] = fetchMock.mock.calls[0];
+    const query = new URL(String(url)).searchParams;
+    expect(init?.method).toBe("PATCH");
+    expect(query.get("verification_token")).toBe(`eq.${"a".repeat(64)}`);
+    expect(query.get("or")).toBe(NOT_CURRENTLY_VERIFIED);
+    const body = JSON.parse(String(init?.body));
+    expect(body).not.toHaveProperty("verified_at");
   });
 });

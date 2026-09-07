@@ -47,7 +47,8 @@ export function normalizeDomain(input: string): NormalizationResult {
     };
   }
 
-  if (/[\s/?#]/.test(trimmed)) {
+  // A backslash too: the URL parser would read `example.com\path` as a path.
+  if (/[\s/\\?#]/.test(trimmed)) {
     return {
       ok: false,
       message: "Enter the domain on its own, without a path or query string.",

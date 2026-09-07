@@ -216,7 +216,7 @@ Before creating a challenge, the backend:
 3. Rejects schemes, paths, queries, fragments, ports, IP addresses, local names such as `localhost`, malformed labels, and a pragmatic set of common public suffixes that cannot be privately controlled. This set is deliberately limited rather than a complete implementation of the Public Suffix List. When a URL prefix is present, return: "Please enter the domain without the URL prefix (e.g., example.com instead of https://example.com)."
 4. Preserves the exact registrable domain or subdomain the user intends to claim.
 
-Normalization is shared TypeScript, with early browser feedback and authoritative server validation. Known limitation: URL-based IDNA parsing currently accepts a backslash path such as `example.com\path` as `example.com`; strict rejection remains to be fixed.
+Normalization is shared TypeScript, with early browser feedback and authoritative server validation. Path-like input is rejected before the URL parser sees it, including a backslash such as `example.com\path`, which that parser would otherwise read as a path and quietly drop.
 
 `PATCH` edits the existing row: update the normalized domain, issue a fresh token and expiry, and clear `lastCheck`. Its ID and page URL remain unchanged.
 
@@ -268,7 +268,7 @@ function getClaimViewState(claim: DomainClaim, now: Date): ClaimViewState {
 
 **List presentation.** One badge component maps `verified` → Verified, `setup_required` → Unchecked, diagnostic states and `expired` → Needs attention, and `superseded` → Superseded. The detail panel names the precise outcome. This mapping never affects state derivation.
 
-Verified associations outlive token expiry and TXT removal. Successful verification clears `lastCheck`. Known implementation gaps: replacement checks verified status before, but not during, its write; failed-check writes guard the token but not verified status. Concurrent requests can therefore replace a just-verified token or repopulate `lastCheck` after success. Neither grants an unproven association. These gaps do not change the intended rules above.
+Verified associations outlive token expiry and TXT removal. Successful verification clears `lastCheck`. The two writes that only make sense on a pending claim, token replacement and recording a failed check, carry the negation of `is_currently_verified` as a filter, so a proof that lands between a route's read and its write makes the write match no row instead of replacing a just-verified token or repopulating `lastCheck` after success. The route then reloads the claim and returns what is now true. A superseded claim still passes the filter, since it is the one that needs a fresh challenge.
 
 Token lifetime is a property of a pending challenge. The client never reads `tokenExpiresAt` to decide anything; it displays the instant and takes every decision from `state`. A verified claim shows no record at all, since the proof is complete and the TXT value has no ongoing job; the verified panel tells the user they may remove it.
 

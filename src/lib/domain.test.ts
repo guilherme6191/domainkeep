@@ -31,6 +31,7 @@ describe("normalizeDomain", () => {
 
   it.each([
     ["example.com/path", "a path"],
+    ["example.com\\path", "a backslash path"],
     ["example.com:8080", "a port"],
     ["user@example.com", "an email address"],
     ["localhost", "a local name"],

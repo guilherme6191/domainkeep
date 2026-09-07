@@ -60,7 +60,11 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   if (isPending) {
     return (
       <div className="space-y-5">
-        <Skeleton className="h-8 w-56" />
+        {/* Same row as the loaded header: back link left, delete right. */}
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-28" />
+        </div>
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-48 w-full" />
       </div>

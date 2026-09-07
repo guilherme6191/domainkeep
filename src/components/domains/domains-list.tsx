@@ -56,8 +56,15 @@ export function DomainsList({
 
   if (isPending) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-9 w-40" />
+      <div className="space-y-6">
+        {/* Same row as the loaded header: title left, add and menu right. */}
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-9 w-40" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-28" />
+            <Skeleton className="size-9" />
+          </div>
+        </div>
         <Skeleton className="h-40 w-full" />
       </div>
     );

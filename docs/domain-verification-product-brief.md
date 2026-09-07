@@ -78,7 +78,7 @@ Supporting reasoning lives in [README § Tradeoffs and limitations](../README.md
 - Expired or compromised challenges can be deliberately replaced
 - A successful proof creates one active account association; a newer proof atomically supersedes it, explains the change to both accounts, and never exposes either account's identity
 - Verification is point-in-time: the TXT record is not required after success
-- The complete flow is accessible and deployed at [https://domainkeep-lm3sjdv4g-guilherme6191s-projects.vercel.app](https://domainkeep-lm3sjdv4g-guilherme6191s-projects.vercel.app)
+- The complete flow is accessible and deployed at [https://domainkeep.vercel.app](https://domainkeep.vercel.app)
 
 ### P1 — recovery and polish
 

@@ -12,6 +12,8 @@ describe("parsePage", () => {
     expect(parsePage("4")).toBe(4);
     expect([parsePage(null), parsePage("abc"), parsePage("0"), parsePage("-3"), parsePage("2.5")])
       .toEqual([1, 1, 1, 1, 1]);
+    // A page whose offset would overflow the database is still an empty page.
+    expect(parsePage("1e21")).toBe(1_000_000);
   });
 });
 

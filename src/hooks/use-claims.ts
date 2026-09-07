@@ -134,9 +134,12 @@ export function useDeleteClaim(options?: { onSuccess?: () => void }) {
       // Deleting from the detail page returns to the list, which must not paint
       // the removed row first.
       evictClaims(queryClient, [id]);
+      // A page short one row is not the page the server would send, so a
+      // mounted list refetches. Nothing is mounted during the detail-page
+      // navigation, so no response can land mid-flight there.
       void queryClient.invalidateQueries({
         queryKey: claimsKey,
-        refetchType: "none",
+        refetchType: "active",
       });
 
       options?.onSuccess?.();

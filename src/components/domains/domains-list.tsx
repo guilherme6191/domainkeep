@@ -8,6 +8,7 @@ import { AddDomainForm } from "@/components/domains/add-domain-form";
 import { DeleteDomainsDialog } from "@/components/domains/delete-domains-dialog";
 import { DomainsActionsMenu } from "@/components/domains/domains-actions-menu";
 import { DomainsTable } from "@/components/domains/domains-table";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClaims } from "@/hooks/use-claims";
+import { ApiRequestError } from "@/lib/api/client";
 import { pageHref, type PageSize } from "@/lib/pagination";
 
 /**
@@ -35,7 +37,8 @@ export function DomainsList({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { data, isPending, isError, isPlaceholderData } = useClaims(page, pageSize);
+  const { data, isPending, isError, error, refetch, isFetching, isPlaceholderData } =
+    useClaims(page, pageSize);
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   // Selection belongs to the rows on screen, so it is narrowed to them rather
@@ -60,11 +63,23 @@ export function DomainsList({
     );
   }
 
+  // Same shape as the detail page's failure: a plain message, the request
+  // reference when the API gave one, and a retry that keeps the page in place.
   if (isError) {
     return (
-      <p className="text-sm">
-        We couldn&rsquo;t load your domains. Please refresh and try again.
-      </p>
+      <div className="space-y-4">
+        <p className="text-sm" role="alert">
+          We couldn&rsquo;t load your domains. Try again.
+        </p>
+        {error instanceof ApiRequestError && error.requestId ? (
+          <p className="text-muted-foreground text-sm">
+            Reference: {error.requestId}
+          </p>
+        ) : null}
+        <Button size="sm" onClick={() => void refetch()} disabled={isFetching}>
+          {isFetching ? "Retrying…" : "Retry"}
+        </Button>
+      </div>
     );
   }
 

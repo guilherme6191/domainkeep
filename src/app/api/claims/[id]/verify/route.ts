@@ -108,9 +108,7 @@ export async function POST(request: Request, { params }: Context) {
       error instanceof VerificationConflictError
     ) {
       try {
-        const ownerId = await currentUserId();
-        const { id } = await params;
-        const reloaded = ownerId ? await getClaim(id, ownerId) : null;
+        const reloaded = await getClaim(id, ownerId);
         if (reloaded) return NextResponse.json(toClaimView(reloaded));
       } catch {
         // fall through to the generic failure below

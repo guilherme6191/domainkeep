@@ -20,6 +20,8 @@ And the email that previous holder received, sent with Resend, explaining what h
 
 ![The takeover notice email](docs/images/takeover-email.png)
 
+Want to see more of the UI without signing up? Every state is pictured in [docs/screenshots.md](docs/screenshots.md).
+
 ## How failure and recovery work
 
 The challenge asks for a workflow a user can understand, watch fail, and fix. Three choices carry that:
@@ -122,4 +124,5 @@ pnpm lint
 | Document | What it covers |
 | --- | --- |
 | [Local development](LOCAL-DEVELOPMENT.md) | Running the app locally, with the Clerk and Supabase setup and the environment reference. |
+| [Screenshots](docs/screenshots.md) | Every screen and claim state, for reviewers who would rather look than sign up. |
 | [docs/](docs/) | Product brief and technical specification: principles, scope, API contracts, state modeling, persistence, and security. |

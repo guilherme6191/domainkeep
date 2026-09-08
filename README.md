@@ -63,16 +63,7 @@ The domains list collapses these into five badges by next action: Verified, Unch
 
 Next.js App Router · TypeScript · TanStack Query · Clerk · Supabase Postgres · Resend · Tailwind + shadcn/ui · Vercel. One deployment holds both halves. The frontend uses TanStack Query against `/api/claims` and renders server-derived claim state; it never decides that a domain is verified.
 
-```text
-src/lib/domain.ts        # normalization, one implementation shared by browser and server
-src/lib/claim-state.ts   # the derived state ladder and the definition of "currently verified"
-src/lib/dns/             # resolver adapter (the seam tests replace) and the pure classifier
-src/lib/db/claims.ts     # every query
-src/lib/verification.ts  # the check both DNS routes run, with or without takeover
-src/lib/mail/            # the Resend mailer and the takeover-notice composition
-src/app/api/claims/      # the HTTP boundary
-supabase/migrations/     # table, constraints, row-level security, the reassignment function, and the takeover-notice marker
-```
+`src/lib` holds everything shared across the frontend and the backend, split by domain: `domain.ts` (normalization), `claim-state.ts` (the derived state ladder), `dns/` (the resolver and the classifier), `db/` (every query), `verification.ts` (the DNS check shared by verify and take over), and `mail/` (the Resend notice). `src/app/api/claims/` is the HTTP boundary, and `supabase/migrations/` holds the schema, row-level security, and the reassignment function.
 
 The exclusivity rule lives in Postgres, not in application code: a partial unique index on `normalized_domain` where the claim is currently verified, and a `verify_domain_claim` function that supersedes the previous holder and expires its token in the same transaction, after the backend has verified the DNS proof and the user has confirmed the transfer.
 

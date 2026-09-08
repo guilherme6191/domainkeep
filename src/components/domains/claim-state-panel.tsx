@@ -66,11 +66,12 @@ function RecordNotFound({ claim }: { claim: ClaimView }) {
   );
 }
 
-// Not destructive: the record is there, one value needs swapping. The card
-// below shows expected and found, so the alert is the headline only.
+// The one recoverable state where the record is definitely wrong, so it earns
+// the badge's amber. The card below shows expected and found, so the alert is
+// the headline only.
 function ValueMismatch() {
   return (
-    <Alert>
+    <Alert className="border-amber-400/35 text-amber-300">
       <AlertCircle />
       <AlertTitle>
         We found the record, but its value doesn&rsquo;t match.
@@ -278,8 +279,9 @@ function SupersededNote({ claim }: { claim: ClaimView }) {
   );
 }
 
-// Colour only where something is settled: green verified, red superseded.
-// Recoverable failures, expiry included, stay neutral.
+// Colour where something is settled or definitely wrong: green verified, red
+// superseded, amber mismatch. Not found, DNS errors and expiry stay neutral,
+// because the cause may be time rather than the user.
 export function ClaimStatePanel({ claim }: { claim: ClaimView }) {
   if (claim.state === "superseded") return <Superseded claim={claim} />;
 

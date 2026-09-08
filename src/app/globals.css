@@ -128,3 +128,15 @@
     @apply font-sans;
   }
 }
+
+.cl-formFieldInput__emailAddress:focus {
+  box-shadow:
+    0px 0px 0px 1px color-mix(in srgb, transparent, var(--foreground) 28%),
+    0px 0px 1px 0px color-mix(in srgb, transparent, var(--foreground) 11%) !important;
+}
+
+.cl-formFieldInput__password:focus {
+  box-shadow:
+    0px 0px 0px 1px color-mix(in srgb, transparent, var(--foreground) 28%),
+    0px 0px 1px 0px color-mix(in srgb, transparent, var(--foreground) 11%) !important;
+}

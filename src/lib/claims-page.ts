@@ -1,8 +1,8 @@
 import "server-only";
 import { toClaimView } from "@/lib/api/view";
-import { listClaims } from "@/lib/db/claims";
+import { getClaim, listClaims } from "@/lib/db/claims";
 import type { PageSize } from "@/lib/pagination";
-import type { ClaimPage } from "@/lib/types";
+import type { ClaimPage, ClaimView } from "@/lib/types";
 
 /**
  * One page of the caller's claims as the API answers it. The list route and
@@ -24,4 +24,17 @@ export async function loadClaimPage(
     pageSize,
     total,
   };
+}
+
+/**
+ * One claim as `GET /api/claims/:id` answers it, or null when it does not
+ * exist for this owner. The detail page reads it on the server for the tab
+ * title and hands the same object to the client cache.
+ */
+export async function loadClaim(
+  ownerId: string,
+  id: string,
+): Promise<ClaimView | null> {
+  const record = await getClaim(id, ownerId);
+  return record ? toClaimView(record) : null;
 }

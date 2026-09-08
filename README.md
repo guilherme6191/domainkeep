@@ -1,6 +1,6 @@
 # Domain Ownership Verification
 
-DomainKeep is a domain claiming product, built for the [Resend Product Engineer challenge](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153). A user enters a domain they control, publishes one TXT record at that name with the value `resend-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
+Domainkeep is a domain claiming product, built for the [Resend Product Engineer challenge](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153). A user enters a domain they control, publishes one TXT record at that name with the value `resend-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
 
 A verified claim can be superseded by another account's fresh DNS proof.
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import { AppHeader } from "@/components/app-header";
 import { DomainsList } from "@/components/domains/domains-list";
@@ -5,6 +6,8 @@ import { currentUserId } from "@/lib/api/session";
 import { loadClaimPage } from "@/lib/claims-page";
 import { parsePage, parsePageSize } from "@/lib/pagination";
 import { claimListKey } from "@/lib/query-keys";
+
+export const metadata: Metadata = { title: "Domains" };
 
 function first(value: string | string[] | undefined): string | null {
   return (Array.isArray(value) ? value[0] : value) ?? null;

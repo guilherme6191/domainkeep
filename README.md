@@ -95,9 +95,11 @@ pnpm db:migrate              # 2. create the schema
 pnpm dev                     # 3. http://localhost:3000
 ```
 
+For easy local dev, feel free to get the env vars from me to reuse my clerk and supabase instances.
+
 Then sign up, add a domain you control, publish the TXT record it shows you, and click **Verify domain**. The check is a real public DNS lookup, so it has to be a domain whose zone you can edit.
 
-No credentials yet? The [local development guide](LOCAL-DEVELOPMENT.md) walks through creating the free Clerk application and Supabase project the app needs, and lists every variable in `.env.local`.
+No credentials or the original env vars? The [local development guide](LOCAL-DEVELOPMENT.md) walks through creating the free Clerk application and Supabase project the app needs, and lists every variable in `.env.local`.
 
 ## Testing
 
@@ -115,6 +117,5 @@ pnpm lint
 
 | Document | What it covers |
 | --- | --- |
-| [Challenge description](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153) | The original Resend prompt. |
 | [Local development](LOCAL-DEVELOPMENT.md) | Running the app locally, with the Clerk and Supabase setup and the environment reference. |
 | [docs/](docs/) | Product brief and technical specification: principles, scope, API contracts, state modeling, persistence, and security. |

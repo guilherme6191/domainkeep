@@ -46,13 +46,16 @@ vi.mock("@/lib/db/claims", async (importOriginal) => {
 });
 
 const { POST } = await import("@/app/api/claims/[id]/verify/route");
+// Both routes are one call into the same function, so the shared behaviour is
+// covered once, here, and only the consent they carry is tested per route.
+const { POST: TAKE_OVER } = await import("@/app/api/claims/[id]/take-over/route");
 
 function fakeDns(lookup: TxtLookup) {
   setResolver({ resolveTxt: async () => lookup });
 }
 
-function call(id = CLAIM_ID) {
-  return POST(new Request("http://localhost/verify", { method: "POST" }), {
+function call(id = CLAIM_ID, route = POST) {
+  return route(new Request("http://localhost/claim", { method: "POST" }), {
     params: Promise.resolve({ id }),
   });
 }
@@ -241,5 +244,40 @@ describe("POST /api/claims/:id/verify", () => {
     expect(body.state).toBe("verified");
     expect(body.tookOverAt).toBe(YESTERDAY.toISOString());
     expect(resolveTxt).not.toHaveBeenCalled();
+  });
+});
+
+describe("takeover consent", () => {
+  beforeEach(() => {
+    getClaim.mockResolvedValue(record());
+    fakeDns({ outcome: "records", records: [[`resend-verify=${TOKEN}`]] });
+    verifyClaimAtomically.mockResolvedValue(record({ verifiedAt: NOW }));
+  });
+
+  // The transaction is the only place that can see the holder under a lock, so
+  // permission to displace it has to travel with the call.
+  it.each([
+    ["verify never transfers", POST, false],
+    ["take-over may", TAKE_OVER, true],
+  ])("%s", async (_name, route, allowTakeover) => {
+    const response = await call(CLAIM_ID, route);
+
+    expect(response.status).toBe(200);
+    expect(verifyClaimAtomically).toHaveBeenCalledWith(
+      expect.objectContaining({ token: TOKEN, allowTakeover }),
+    );
+  });
+
+  it("reports a matching proof on a held domain without telling the holder", async () => {
+    verifyClaimAtomically.mockResolvedValue(
+      record({ lastCheck: { result: "held_by_another", checkedAt: NOW } }),
+    );
+
+    const body: ClaimView = await (await call()).json();
+
+    expect(body.state).toBe("held_by_another");
+    expect(body.verifiedAt).toBeNull();
+    // Nothing moved, so there is nothing to tell anyone about.
+    expect(notifyTakeover).not.toHaveBeenCalled();
   });
 });

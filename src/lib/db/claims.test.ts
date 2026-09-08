@@ -11,8 +11,14 @@ vi.mock("@/lib/db/client", async () => {
   return { dbAdmin: () => client, db: () => client };
 });
 
-const { deleteClaims, listClaims, recordCheckFailure, replaceToken, updateClaimDomain } =
-  await import("@/lib/db/claims");
+const {
+  deleteClaims,
+  listClaims,
+  recordCheckFailure,
+  replaceToken,
+  updateClaimDomain,
+  verifyClaimAtomically,
+} = await import("@/lib/db/claims");
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -167,4 +173,57 @@ describe("writes that require a pending claim", () => {
     const body = JSON.parse(String(init?.body));
     expect(body).not.toHaveProperty("verified_at");
   });
+});
+
+// Only the transaction can see, under the row lock, whether anyone else holds
+// the domain, so the user's answer to the confirmation travels with the call.
+describe("verifyClaimAtomically", () => {
+  const ROW = {
+    id: "claim-id",
+    normalized_domain: "example.com",
+    owner_id: "user-owner",
+    verification_token: "a".repeat(64),
+    token_expires_at: "2026-09-14T00:00:00Z",
+    verified_at: "2026-09-07T00:00:00Z",
+    superseded_at: null,
+    took_over_at: null,
+    last_check_result: null,
+    last_check_at: null,
+    last_check_observed_values: null,
+    created_at: "2026-09-01T00:00:00Z",
+    updated_at: "2026-09-07T00:00:00Z",
+  };
+
+  function json(body: unknown) {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  it.each([false, true])(
+    "sends the caller's takeover consent (%s) to the reassignment function",
+    async (allowTakeover) => {
+      // The function's own return value is ignored: the route reads the claim
+      // back through the same projection every other response uses.
+      fetchMock.mockResolvedValueOnce(json(ROW)).mockResolvedValueOnce(json(ROW));
+
+      const { claim } = await verifyClaimAtomically({
+        id: "claim-id",
+        ownerId: "user-owner",
+        token: "a".repeat(64),
+        allowTakeover,
+      });
+
+      expect(claim.id).toBe("claim-id");
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url)).toContain("/rpc/verify_domain_claim");
+      expect(JSON.parse(String(init?.body))).toEqual({
+        p_claim_id: "claim-id",
+        p_owner_id: "user-owner",
+        p_token: "a".repeat(64),
+        p_allow_takeover: allowTakeover,
+      });
+    },
+  );
 });

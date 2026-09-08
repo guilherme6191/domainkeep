@@ -39,6 +39,29 @@ describe("getClaimViewState", () => {
     ).toBe("record_not_found");
   });
 
+  // The proof matched; the domain is simply someone else's. It is the outcome
+  // of the last check like any other, so it needs no rung of its own.
+  it("reports a proof that landed on a domain another account holds", () => {
+    expect(
+      getClaimViewState(
+        claim({ lastCheck: { result: "held_by_another", checkedAt: NOW } }),
+        NOW,
+      ),
+    ).toBe("held_by_another");
+  });
+
+  it("prefers expired over held, because a dead code must be replaced first", () => {
+    expect(
+      getClaimViewState(
+        claim({
+          tokenExpiresAt: PAST,
+          lastCheck: { result: "held_by_another", checkedAt: NOW },
+        }),
+        NOW,
+      ),
+    ).toBe("expired");
+  });
+
   it("is expired once the token's expiry has passed", () => {
     expect(getClaimViewState(claim({ tokenExpiresAt: PAST }), NOW)).toBe(
       "expired",

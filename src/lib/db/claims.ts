@@ -258,7 +258,9 @@ export async function recordCheckFailure(input: {
   id: string;
   ownerId: string;
   expectedToken: string;
-  result: LastCheckResult;
+  // `held_by_another` depends on another account's row, which only the
+  // reassignment transaction reads under a lock. It is never written here.
+  result: Exclude<LastCheckResult, "held_by_another">;
   observedValues: string[] | null;
   checkedAt: Date;
 }): Promise<ClaimRecord | null> {
@@ -366,11 +368,17 @@ export class VerificationConflictError extends Error {}
 /**
  * Runs the reassignment transaction in the database. Its custom SQLSTATEs let
  * the route tell outcomes apart without parsing messages.
+ *
+ * `allowTakeover` is the user's confirmation, carried into the transaction
+ * because only it can see, under the row lock, whether anyone else holds the
+ * domain. Without it a matching proof stops at `held_by_another` and displaces
+ * no one.
  */
 export async function verifyClaimAtomically(input: {
   id: string;
   ownerId: string;
   token: string;
+  allowTakeover: boolean;
 }): Promise<ClaimRecord> {
   try {
     unwrap(
@@ -378,6 +386,7 @@ export async function verifyClaimAtomically(input: {
         p_claim_id: input.id,
         p_owner_id: input.ownerId,
         p_token: input.token,
+        p_allow_takeover: input.allowTakeover,
       }),
     );
   } catch (error) {

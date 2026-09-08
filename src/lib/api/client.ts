@@ -49,6 +49,8 @@ export const claimsApi = {
     }),
   verify: (id: string) =>
     request<ClaimView>(`/api/claims/${id}/verify`, { method: "POST" }),
+  takeOver: (id: string) =>
+    request<ClaimView>(`/api/claims/${id}/take-over`, { method: "POST" }),
   replaceToken: (id: string) =>
     request<ClaimView>(`/api/claims/${id}/replace-token`, { method: "POST" }),
   remove: (id: string) =>

@@ -4,12 +4,17 @@ export const VERIFICATION_VALUE_PREFIX = "resend-verify=";
 export type LastCheckResult =
   | "record_not_found"
   | "value_mismatch"
-  | "temporary_dns_error";
+  | "temporary_dns_error"
+  /** The proof matched, but another account holds the domain. Only the
+   *  reassignment transaction writes this: it is the one outcome that depends
+   *  on a row the caller may not read. */
+  | "held_by_another";
 
 export type LastCheck =
   | { result: "record_not_found"; checkedAt: Date }
   | { result: "value_mismatch"; observedValues: string[]; checkedAt: Date }
-  | { result: "temporary_dns_error"; checkedAt: Date };
+  | { result: "temporary_dns_error"; checkedAt: Date }
+  | { result: "held_by_another"; checkedAt: Date };
 
 /** The persisted row. */
 export interface DomainClaim {
@@ -34,12 +39,14 @@ export type ClaimViewState =
   | "setup_required"
   | "record_not_found"
   | "value_mismatch"
-  | "temporary_dns_error";
+  | "temporary_dns_error"
+  | "held_by_another";
 
 export type LastCheckView =
   | { result: "record_not_found"; checkedAt: string }
   | { result: "value_mismatch"; observedValues: string[]; checkedAt: string }
-  | { result: "temporary_dns_error"; checkedAt: string };
+  | { result: "temporary_dns_error"; checkedAt: string }
+  | { result: "held_by_another"; checkedAt: string };
 
 /** The API projection: adds derived `state`, never carries `ownerId`. */
 export interface ClaimView {

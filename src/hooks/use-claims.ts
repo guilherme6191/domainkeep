@@ -122,6 +122,11 @@ export function useVerifyClaim(id: string) {
   return useClaimMutation(() => claimsApi.verify(id));
 }
 
+/** The confirmed transfer. Separate from verify so no click can imply consent. */
+export function useTakeOver(id: string) {
+  return useClaimMutation(() => claimsApi.takeOver(id));
+}
+
 export function useReplaceToken(id: string) {
   return useClaimMutation(() => claimsApi.replaceToken(id));
 }

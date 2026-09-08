@@ -47,3 +47,6 @@ yarn-error.log*
 
 # Local scratch
 .scratch/
+
+# ephemeral agent plans
+/docs/plans

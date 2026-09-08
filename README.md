@@ -1,8 +1,8 @@
 # Domain Ownership Verification
 
-Domainkeep is a domain claiming product, built for the [Resend Product Engineer challenge](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153). A user enters a domain they control, publishes one TXT record at that name with the value `resend-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
+Domainkeep is a domain claiming product, built for the [Resend Product Engineer challenge](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153). A user enters a domain they control, publishes one TXT record at that name with the value `resend-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, held by another account, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
 
-A verified claim can be superseded by another account's fresh DNS proof.
+A verified claim can be superseded by another account's fresh DNS proof, once that account confirms the takeover.
 
 **Live app:** [https://domainkeep.vercel.app](https://domainkeep.vercel.app) — sign up with any email, add a domain whose DNS you can edit, and follow the on-screen instructions.
 
@@ -14,21 +14,21 @@ The challenge asks for a workflow a user can understand, watch fail, and fix. Th
 
 - **Each outcome names its fix.** Record not found, value mismatch, and DNS not answering are separate states with separate next steps: check the name, compare the value, or wait and retry. A mismatch shows the expected value beside what DNS actually returned.
 - **Retrying keeps the code; replacing it is deliberate.** Check again reuses the token until expiry. A missing record may need time or a configuration correction, not a new code. Generate a new code is a separate action that invalidates the old value.
-- **Losing a domain isn't silent.** When another account proves control, the previous holder's claim turns Superseded in their list so they don't lose track of it and they receive an email, sent with Resend, linking to that claim. If they still control the DNS, they generate a new code and verify again to take it back. Copy across the page guides users to resolve ownership issues with the Domain owner as well.
+- **Losing a domain isn't silent.** When another account proves control, the previous holder's claim turns Superseded in their list so they don't lose track of it and they receive an email, sent with Resend, linking to that claim. If they still control the DNS, they generate a new code, verify again, and confirm to take it back. Copy across the page guides users to resolve ownership issues with the Domain owner as well.
 
 ## Tradeoffs and limitations
 
 - **Authentication is required, through Clerk.** Although optional for the challenge, durable accounts and user objects are what a domain/user association hangs on: they make competing claims meaningful and give the previous holder somewhere to receive feedback. Clerk keeps that overhead out of the exercise. The cost is a sign-up step before anything else; open email sign-up keeps it from becoming a barrier for reviewers.
 - **One TXT record, at the exact name claimed.** Exact-name verification supports delegated subdomains and keeps the proof unambiguous. The cost is that verifying a parent does not cover its children, and users need enough DNS knowledge to place the record correctly; the record card shows both the provider-style name and the full hostname to close that gap.
-- **A newer proof takes the domain over, and neither side learns who.** Fresh DNS proof supports ownership changes, team migrations, and agency handoffs without support tickets. The cost is that people sharing DNS access can transfer a domain back and forth. Both sides are told: the winner sees a takeover note, the previous holder sees a superseded claim and gets an email through Resend. Neither learns the other's identity: the product resolves control, not intent. Transfer cooldowns and dispute handling are deferred.
+- **A newer proof can take the domain over, and neither side learns who.** Fresh DNS proof supports ownership changes, team migrations, and agency handoffs without support tickets. The cost is that people sharing DNS access can transfer a domain back and forth. Both sides are told: the winner sees a takeover note, the previous holder sees a superseded claim and gets an email through Resend. Neither learns the other's identity: the product resolves control, not intent. Transfer cooldowns and dispute handling are deferred.
 - **Verification is point in time.** A check records control at that moment, and the TXT record is not required afterwards, so users can clean up their zone. The cost is that a claim stays verified after DNS control is lost until someone deletes it or proves control anew. Automatic rechecks and revocation rules are deferred.
-- **A takeover happens only inside a check the user is watching.** Nothing verifies outside a click: no server polling, no background job, no automatic retry. Every Verify button carries the same takeover warning, so the click is consent to a possible transfer without revealing whether one will happen. Server-side polling would smooth setup, but it would also let a takeover land at 3am with nobody watching, which undercuts the disclosure the model rests on. The cost is that when propagation is slow the user has to come back and check again; a TXT lookup is usually fast and retries are cheap, so that wait stays short.
+- **A takeover happens only when the user confirms it.** Verifying proves control; it never moves a domain by itself. If the proof matches and another account holds the domain, the user is told and asked, and the transfer runs only on an explicit **Take over** — after a fresh DNS check, so control is proved in the request that acts on it. Nothing verifies outside a click either: no server polling, no background job, no automatic retry, so a transfer can never land at 3am with nobody watching. The cost is one extra step in the rare shared-domain case, and that when propagation is slow the user has to come back and check again; a TXT lookup is usually fast and retries are cheap, so that wait stays short.
 - **Correction is narrow, deletion is final.** A domain can be edited only while it has never verified, which covers the typo case; after that, the user deletes it and adds the corrected one. Deletion is immediate and permanent, so a verified domain is free again at once. The cost is that no history survives.
 - **No rate limiting or attempt history.** Checks are unbounded and only the latest result is kept. Both are deferred: they would add complexity without much value for this exercise.
 
 ## Claim states
 
-The claim view has seven states, derived from durable fields in the order shown: the first row whose condition holds wins, so the stored facts remain the source of truth.
+The claim view has eight states, derived from durable fields in the order shown: the first row whose condition holds wins, so the stored facts remain the source of truth.
 
 | State | Derived when | Meaning and next action |
 | --- | --- | --- |
@@ -39,10 +39,11 @@ The claim view has seven states, derived from durable fields in the order shown:
 | `record_not_found` | `lastCheck.result` is `record_not_found` | No `resend-verify=` value answered at the name. Check the name and the prefix, wait, and retry. |
 | `value_mismatch` | `lastCheck.result` is `value_mismatch` | A `resend-verify=` value exists but none matches. Compare, correct, and retry. |
 | `temporary_dns_error` | `lastCheck.result` is `temporary_dns_error` | DNS did not respond reliably. Retry without changing the record. |
+| `held_by_another` | `lastCheck.result` is `held_by_another` | The record matched, but another account holds the domain. Nothing has moved; take it over or leave it. |
 
 `superseded` comes first because it can coexist with a historical `verifiedAt`; once the owner generates a new code, the claim is an ordinary pending one again.
 
-The domains list collapses these into four badges by next action: Verified, Unchecked, Needs attention (the three diagnostic states and expired, never called "failed" because the cause might be propagation - the goal at the list is to know which ones need attention for further action and it's based on progressive disclosure, and to make it scannable easily), and Superseded, which stays separate as the previous holder's in-app takeover signal. The detail page names the exact state.
+The domains list collapses these into five badges by next action: Verified, Unchecked, Needs attention (the three diagnostic states and expired, never called "failed" because the cause might be propagation - the goal at the list is to know which ones need attention for further action and it's based on progressive disclosure, and to make it scannable easily), Held elsewhere, which asks for a decision rather than a fix, and Superseded, which stays separate as the previous holder's in-app takeover signal. The detail page names the exact state.
 
 ## Architecture
 
@@ -53,12 +54,13 @@ src/lib/domain.ts        # normalization, one implementation shared by browser a
 src/lib/claim-state.ts   # the derived state ladder and the definition of "currently verified"
 src/lib/dns/             # resolver adapter (the seam tests replace) and the pure classifier
 src/lib/db/claims.ts     # every query
+src/lib/verification.ts  # the check both DNS routes run, with or without takeover
 src/lib/mail/            # the Resend mailer and the takeover-notice composition
 src/app/api/claims/      # the HTTP boundary
 supabase/migrations/     # table, constraints, row-level security, the reassignment function, and the takeover-notice marker
 ```
 
-The exclusivity rule lives in Postgres, not in application code: a partial unique index on `normalized_domain` where the claim is currently verified, and a `verify_domain_claim` function that supersedes the previous holder and expires its token in the same transaction, after the backend has verified the DNS proof.
+The exclusivity rule lives in Postgres, not in application code: a partial unique index on `normalized_domain` where the claim is currently verified, and a `verify_domain_claim` function that supersedes the previous holder and expires its token in the same transaction, after the backend has verified the DNS proof and the user has confirmed the transfer.
 
 ### Routes
 
@@ -69,7 +71,8 @@ The exclusivity rule lives in Postgres, not in application code: a partial uniqu
 | `DELETE /api/claims` | Remove the selected claims in one owner-filtered statement. |
 | `GET /api/claims/:id` | One claim, with its derived state. |
 | `PATCH /api/claims/:id` | Fix a typo in the domain. Refused once the claim has ever verified. |
-| `POST /api/claims/:id/verify` | At most one DNS lookup. Transfers any existing association on valid proof. |
+| `POST /api/claims/:id/verify` | At most one DNS lookup. Proves control; never transfers a domain another account holds. |
+| `POST /api/claims/:id/take-over` | The confirmed transfer. Looks DNS up again, then supersedes the previous holder. |
 | `POST /api/claims/:id/replace-token` | Generate a new code, on purpose or after expiry. |
 | `DELETE /api/claims/:id` | Remove the claim. A verified domain becomes free again. |
 

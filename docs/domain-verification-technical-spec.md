@@ -25,7 +25,7 @@ This spec owns architecture, contracts, persistence, and security. The [brief](d
 
 - **Claim:** One account/domain association, pending or verified.
 - **Check:** A user-requested DNS lookup; `lastCheck` stores only a diagnostic outcome.
-- **Takeover:** A valid proof that transfers an active association. The previous holder's claim is superseded.
+- **Takeover:** A transfer of an active association, requiring both a valid proof and the prover's explicit confirmation. The previous holder's claim is superseded.
 
 ### Component responsibilities
 
@@ -72,7 +72,7 @@ The projection omits `ownerId`, serializes dates, and derives `state` on the ser
 
 The verified view shows the new holder's takeover note only during the ten minutes after `tookOverAt`. The window is decided once when the view mounts: a page left open keeps the note, and a later load uses the original timestamp rather than restarting the window. This is presentation only: it changes neither the stored timestamp nor transfer eligibility. The previous holder's superseded explanation does not expire on this timer.
 
-A domain held elsewhere produces the same creation response and DNS diagnoses as an unheld domain. Every active pending claim has the same warning beside its verify action: verification transfers any existing association, so check with whoever manages the domain first. Conditional warnings would disclose associations before proof. After proof, explain the transfer without identifying either account.
+A domain held elsewhere produces the same creation response and DNS diagnoses as an unheld domain: nothing distinguishes it until a proof matches. Proof is the threshold. Once a check matches, the prover controls the domain's DNS, and telling them it is held elsewhere reveals nothing they could not establish by publishing a record; withholding it would only mean transferring in silence or refusing without a reason. The claim is therefore reported as `held_by_another`, and the transfer waits for a second, explicit request. Whether it is disclosed or transferred, neither account is ever identified to the other.
 
 ### Routes
 
@@ -83,6 +83,7 @@ A domain held elsewhere produces the same creation response and DNS diagnoses as
 | `GET /api/claims/:id` | `200` | — | `ClaimView` |
 | `PATCH /api/claims/:id` | `200` | `{ domain: string }` | `ClaimView` |
 | `POST /api/claims/:id/verify` | `200` | — | `ClaimView` |
+| `POST /api/claims/:id/take-over` | `200` | — | `ClaimView` |
 | `POST /api/claims/:id/replace-token` | `200` | — | `ClaimView` |
 | `DELETE /api/claims/:id` | `204` | — | — |
 | `DELETE /api/claims` | `200` | `{ ids: string[] }` | `{ deleted: string[] }` |
@@ -93,11 +94,13 @@ Ownership comes from the server session. The only meaningful request-body field 
 
 Creation is idempotent per `(session user, normalized domain)`, including concurrent requests: return the existing claim with `200`, otherwise create it with `201`.
 
-### `POST /verify` returns 200 for every classified outcome
+### The DNS routes return 200 for every classified outcome
 
-Missing records, mismatches, and resolver failures return `200` with a diagnostic `ClaimView`, not an HTTP error. The client replaces its cached claim with that response. Unexpected failures return `500`.
+Missing records, mismatches, resolver failures, and a domain held elsewhere all return `200` with a diagnostic `ClaimView`, not an HTTP error. The client replaces its cached claim with that response. Unexpected failures return `500`.
 
-This is the only DNS route, with at most one lookup per request. Already-verified claims and expired challenges return their current view without a lookup. Neither client nor server polls: checks require **Verify domain** or **Check again**.
+`verify` and `take-over` are the only DNS routes, with at most one lookup per request each. They run the same code and differ in one thing: what a matching proof is permitted to do. `verify` never transfers, so a match on a held domain records `held_by_another` and stops. `take-over` carries the user's answer to that question and may transfer — and it resolves DNS again rather than trusting the earlier match, so control is always proved in the request that acts on it. Already-verified claims and expired challenges return their current view without a lookup, on both routes.
+
+Neither client nor server polls: checks require **Verify domain**, **Check again**, or **Take over**.
 
 ### Errors
 
@@ -186,6 +189,10 @@ type LastCheck =
   | {
       result: "temporary_dns_error";
       checkedAt: Date;
+    }
+  | {
+      result: "held_by_another";
+      checkedAt: Date;
     };
 
 interface DomainClaim {
@@ -215,7 +222,7 @@ CHECK (took_over_at IS NULL OR verified_at IS NOT NULL)
 CHECK (took_over_at IS NULL OR superseded_at IS NULL)
 ```
 
-The database stores `lastCheck` in separate columns, projected as the discriminated union above. Observations are bounded as specified under [DNS lookup and matching](#dns-lookup-and-matching).
+The database stores `lastCheck` in separate columns, projected as the discriminated union above, with a CHECK constraint listing the four permitted results. `held_by_another` is the one result the application never writes: it depends on another account's row, which only the reassignment transaction reads under a lock, so that function writes it and the repository's check-failure update refuses it by type. Observations are bounded as specified under [DNS lookup and matching](#dns-lookup-and-matching).
 
 ### Domain validation
 
@@ -261,7 +268,8 @@ type ClaimViewState =
   | "setup_required"
   | "record_not_found"
   | "value_mismatch"
-  | "temporary_dns_error";
+  | "temporary_dns_error"
+  | "held_by_another";
 
 function getClaimViewState(claim: DomainClaim, now: Date): ClaimViewState {
   if (holdsSupersededToken(claim)) return "superseded";
@@ -274,9 +282,11 @@ function getClaimViewState(claim: DomainClaim, now: Date): ClaimViewState {
 
 `holdsSupersededToken` means `supersededAt` is set and `tokenExpiresAt <= supersededAt`. It outranks expiry so the previous holder sees the transfer rather than ordinary expiration. Replacing the token restores pending states while retaining the loss as context; successful re-proof clears it.
 
+`held_by_another` needs no rung of its own: it is the outcome of the last check like any other, so a claim whose code expires while held reads as `expired`, and the code has to be replaced before anything else. It is a record of what the last check found, never standing permission — see [The DNS routes](#the-dns-routes-return-200-for-every-classified-outcome).
+
 `setup_required` means only that the current challenge has not been checked and must not render as an error. `checking` is transient frontend request state and is never persisted.
 
-**List presentation.** One badge component maps `verified` → Verified, `setup_required` → Unchecked, diagnostic states and `expired` → Needs attention, and `superseded` → Superseded. The detail panel names the precise outcome. This mapping never affects state derivation.
+**List presentation.** One badge component maps `verified` → Verified, `setup_required` → Unchecked, the remaining diagnostic states and `expired` → Needs attention, `held_by_another` → Held elsewhere, and `superseded` → Superseded. The detail panel names the precise outcome. This mapping never affects state derivation.
 
 Verified associations outlive token expiry and TXT removal. Successful verification clears `lastCheck`. The two writes that only make sense on a pending claim, token replacement and recording a failed check, carry the negation of `is_currently_verified` as a filter, so a proof that lands between a route's read and its write makes the write match no row instead of replacing a just-verified token or repopulating `lastCheck` after success. The route then reloads the claim and returns what is now true. A superseded claim still passes the filter, since it is the one that needs a fresh challenge.
 
@@ -284,14 +294,17 @@ Token lifetime is a property of a pending challenge. The client never reads `tok
 
 ### Reassignment and atomicity
 
-After DNS matches, the route calls one Postgres function, `verify_domain_claim(claim_id, owner_id, token)`, through the server-only client. The function completes the transfer in a single transaction, on the database clock:
+After DNS matches, the route calls one Postgres function, `verify_domain_claim(claim_id, owner_id, token, allow_takeover)`, through the server-only client. It completes the transfer in a single transaction, on the database clock:
 
 1. Lock and reload the winning claim by id and owner.
 2. Return unchanged if already verified; otherwise confirm the checked token is still current and unexpired.
-3. Lock and supersede any current holder through an update.
-4. Clear that holder's `tookOverAt` and expire its token in the same update.
-5. Mark the winning claim as verified, clear `supersededAt` and `lastCheck`, and set `tookOverAt` to the transaction time if a holder was displaced and null otherwise.
-6. Return the winning row. The repository then reloads it through the user-scoped read client.
+3. Branch on `allow_takeover`. When it is false and any other account currently holds the domain, record `held_by_another` on the caller's row and return: nothing else is written, and no one is notified. When it is false and nobody holds the domain, skip to step 6 with no holder displaced.
+4. Lock and supersede any current holder through an update.
+5. Clear that holder's `tookOverAt` and expire its token in the same update.
+6. Mark the winning claim as verified, clear `supersededAt` and `lastCheck`, and set `tookOverAt` to the transaction time if a holder was displaced and null otherwise.
+7. Return the winning row. The repository then reloads it through the user-scoped read client.
+
+Step 3 is a branch, not a guard in front of step 4: when takeover is not allowed the supersede update never runs at all. Checking for a holder and then running the transfer anyway would displace an account that verified in between. The reverse race — a holder appearing after step 3 found none — is caught by the unique index below, which rejects the transaction and sends the route down the reload path.
 
 Winner and loser updates are separate statements in the same transaction. A failure rolls back all writes.
 
@@ -317,7 +330,7 @@ WHERE verified_at IS NOT NULL
   AND superseded_at IS NULL;
 ```
 
-The index excludes pending and superseded rows. Its actual migration uses the equivalent `is_currently_verified` helper. A uniqueness conflict or an inactive challenge causes the route to reload and return the current claim with `200`; missing claims return `404`. No advisory lock or automatic retry is used. A later user-requested check can transfer the domain again with valid proof.
+The index excludes pending and superseded rows. Its actual migration uses the equivalent `is_currently_verified` helper. A uniqueness conflict or an inactive challenge causes the route to reload and return the current claim with `200`; missing claims return `404`. No advisory lock or automatic retry is used. A later user-requested check can transfer the domain again with valid proof and a fresh confirmation.
 
 ### Notifying the displaced holder
 
@@ -356,8 +369,9 @@ Every outcome maps to one user decision. Messages are product surface, not debug
 | `value_mismatch` | `resend-verify=` values exist but none exactly matches | Show bounded expected and observed values, prefixed values only, correct DNS, and retry with the same token |
 | `temporary_dns_error` | The resolver times out, refuses, or temporarily fails | Say the record may be correct and retry without changing DNS |
 | `expired` | Seven days elapsed on a pending challenge | Deliberately generate a replacement and explain that the old value is invalid |
-| Existing association | Another account currently holds the domain | Disclose nothing before proof; proceed like an unheld claim |
-| Successful takeover | A different account completes a valid proof | Show verified plus a privacy-safe explanation; supersede the old association and expire its token |
+| Existing association | Another account currently holds the domain | Disclose nothing before proof; proceed like an unheld claim. After a matching proof, disclose it as `held_by_another` and transfer only on an explicit confirmation |
+| `held_by_another` | The proof matched, and another account currently holds the domain | Say the record matched, that the domain is held elsewhere, and that nothing has moved and no one has been told; offer **Take over** and advise checking with whoever manages the domain first |
+| Successful takeover | A different account proves control and confirms the transfer | Show verified plus a privacy-safe explanation; supersede the old association and expire its token |
 | `superseded` | Another account later proved control | Show when it moved and offer a fresh challenge; never identify the winner |
 | Unexpected failure | An outcome cannot be classified | Show the generic API message and request ID; preserve the claim and token for retry |
 
@@ -368,7 +382,7 @@ Starting or failing a competing claim never affects the current association.
 - Reads use the user's Clerk session token. The database grants that role select only, and row-level security limits it to the caller's own rows.
 - Writes use a separate client holding the server's secret key, and route handlers filter every write by the session's owner. The route handlers are therefore the only thing that can create, update, or verify a claim; `verify_domain_claim` is executable only by that role.
 - Foreign and missing claims both return `404`. No API response identifies another account.
-- Pending or failed claims grant no authority. Only a valid DNS proof may atomically move an active association; a superseded row remains readable by its owner but confers no control.
+- Pending or failed claims grant no authority. Only a valid DNS proof, together with an explicit take-over request, may atomically move an active association; a superseded row remains readable by its owner but confers no control. A recorded `held_by_another` is not a permit either: the take-over route proves control again before it transfers.
 - Database access uses the Data API query builder rather than string-built SQL.
 
 ### Observability and privacy

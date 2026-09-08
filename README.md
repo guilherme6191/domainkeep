@@ -8,9 +8,13 @@ A verified claim can be superseded by another account's fresh DNS proof, once th
 
 **Demo video:** [https://www.loom.com/share/df7d209e33044e7090dc277a400afe73](https://www.loom.com/share/df7d209e33044e7090dc277a400afe73)
 
-The recording ends just as I was about to show the two final states of a takeover, so here they are as screenshots. The previous holder's list, with `recomendei.me` now Superseded:
+The recording ends just as I was about to show the final states of a takeover, so here they are as screenshots. The previous holder's list, with `recomendei.me` now Superseded:
 
 ![The domains list, with recomendei.me marked Superseded](docs/images/superseded-in-list.png)
+
+The same claim opened, naming what happened, when, and the way back:
+
+![The superseded claim's detail page](docs/images/superseded-detail.png)
 
 And the email that previous holder received, sent with Resend, explaining what happened and how to take the domain back:
 

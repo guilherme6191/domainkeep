@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PostgrestError } from "@supabase/supabase-js";
 import { DatabaseError, type ClaimRecord } from "@/lib/db/claims";
 import type { ApiError, ClaimView } from "@/lib/types";
-
-const SESSION_USER = "user_owner";
-const CLAIM_ID = "6f1a2b3c-4d5e-4f60-8a9b-0c1d2e3f4a5b";
-const TOKEN = "b".repeat(64);
+import {
+  CLAIM_ID,
+  IN_A_WEEK,
+  NOW,
+  SESSION_USER,
+  YESTERDAY,
+  record,
+} from "@/test/claim-fixtures";
 
 let sessionUserId: string | null = SESSION_USER;
 
@@ -28,29 +32,6 @@ vi.mock("@/lib/db/claims", async (importOriginal) => {
 });
 
 const { PATCH } = await import("@/app/api/claims/[id]/route");
-
-const NOW = new Date();
-const IN_A_WEEK = new Date(NOW.getTime() + 7 * 24 * 3600 * 1000);
-const YESTERDAY = new Date(NOW.getTime() - 24 * 3600 * 1000);
-
-function record(overrides: Partial<ClaimRecord["claim"]> = {}): ClaimRecord {
-  return {
-    claim: {
-      id: CLAIM_ID,
-      normalizedDomain: "recomendei.me",
-      ownerId: SESSION_USER,
-      verificationToken: TOKEN,
-      tokenExpiresAt: IN_A_WEEK,
-      verifiedAt: null,
-      supersededAt: null,
-      tookOverAt: null,
-      lastCheck: null,
-      createdAt: YESTERDAY,
-      updatedAt: YESTERDAY,
-      ...overrides,
-    },
-  };
-}
 
 function patch(domain: string, id = CLAIM_ID) {
   return PATCH(
@@ -86,39 +67,30 @@ describe("PATCH /api/claims/:id", () => {
     expect(updateClaimDomain).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses to edit a verified claim", async () => {
-    getClaim.mockResolvedValue(record({ verifiedAt: YESTERDAY }));
+  // One guard, `verifiedAt !== null`: a verified claim's proof belongs to its
+  // domain, and a superseded claim's history describes the old one. The message
+  // is the only thing that differs, so it is what each row pins.
+  it.each([
+    ["verified", { verifiedAt: YESTERDAY }, "already verified"],
+    [
+      "superseded",
+      { verifiedAt: YESTERDAY, supersededAt: NOW, tokenExpiresAt: NOW },
+      "moved to another account",
+    ],
+    [
+      "superseded with a fresh token",
+      { verifiedAt: YESTERDAY, supersededAt: NOW, tokenExpiresAt: IN_A_WEEK },
+      "moved to another account",
+    ],
+  ])("refuses to edit a %s claim", async (_name, facts, message) => {
+    getClaim.mockResolvedValue(record(facts));
 
     const response = await patch("recomendei.com");
     const body = (await response.json()) as ApiError;
 
     expect(response.status).toBe(409);
     expect(body.error.code).toBe("claim_locked");
-    expect(updateClaimDomain).not.toHaveBeenCalled();
-  });
-
-  it("refuses to edit a superseded claim, so its history never describes another domain", async () => {
-    getClaim.mockResolvedValue(
-      record({ verifiedAt: YESTERDAY, supersededAt: NOW, tokenExpiresAt: NOW }),
-    );
-
-    const response = await patch("recomendei.com");
-    const body = (await response.json()) as ApiError;
-
-    expect(response.status).toBe(409);
-    expect(body.error.code).toBe("claim_locked");
-    expect(updateClaimDomain).not.toHaveBeenCalled();
-  });
-
-  it("still refuses editing after a superseded claim gets a fresh token", async () => {
-    getClaim.mockResolvedValue(
-      record({ verifiedAt: YESTERDAY, supersededAt: NOW, tokenExpiresAt: IN_A_WEEK }),
-    );
-
-    const response = await patch("example.com");
-
-    expect(response.status).toBe(409);
-    expect((await response.json()).error.code).toBe("claim_locked");
+    expect(body.error.message).toContain(message);
     expect(updateClaimDomain).not.toHaveBeenCalled();
   });
 

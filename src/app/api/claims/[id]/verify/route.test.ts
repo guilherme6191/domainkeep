@@ -3,10 +3,14 @@ import type { ClaimRecord } from "@/lib/db/claims";
 import { setResolver } from "@/lib/dns";
 import type { TxtLookup } from "@/lib/dns/resolver";
 import type { ClaimView, LastCheckResult } from "@/lib/types";
-
-const SESSION_USER = "user_owner";
-const CLAIM_ID = "6f1a2b3c-4d5e-4f60-8a9b-0c1d2e3f4a5b";
-const TOKEN = "b".repeat(64);
+import {
+  CLAIM_ID,
+  NOW,
+  SESSION_USER,
+  TOKEN,
+  YESTERDAY,
+  record,
+} from "@/test/claim-fixtures";
 
 let sessionUserId: string | null = SESSION_USER;
 
@@ -42,29 +46,6 @@ vi.mock("@/lib/db/claims", async (importOriginal) => {
 });
 
 const { POST } = await import("@/app/api/claims/[id]/verify/route");
-
-const NOW = new Date();
-const IN_A_WEEK = new Date(NOW.getTime() + 7 * 24 * 3600 * 1000);
-const YESTERDAY = new Date(NOW.getTime() - 24 * 3600 * 1000);
-
-function record(overrides: Partial<ClaimRecord["claim"]> = {}): ClaimRecord {
-  return {
-    claim: {
-      id: CLAIM_ID,
-      normalizedDomain: "recomendei.me",
-      ownerId: SESSION_USER,
-      verificationToken: TOKEN,
-      tokenExpiresAt: IN_A_WEEK,
-      verifiedAt: null,
-      supersededAt: null,
-      tookOverAt: null,
-      lastCheck: null,
-      createdAt: YESTERDAY,
-      updatedAt: YESTERDAY,
-      ...overrides,
-    },
-  };
-}
 
 function fakeDns(lookup: TxtLookup) {
   setResolver({ resolveTxt: async () => lookup });
@@ -223,8 +204,18 @@ describe("POST /api/claims/:id/verify", () => {
     expect(body.state).toBe("setup_required");
   });
 
-  it("rejects an expired challenge before performing any lookup", async () => {
-    getClaim.mockResolvedValue(record({ tokenExpiresAt: YESTERDAY }));
+  // One guard, `tokenExpiresAt <= now`. Supersession expires the loser's token
+  // in the same transaction, so this is also what stops the previous holder
+  // from re-verifying against its leftover record.
+  it.each([
+    ["expired", { tokenExpiresAt: YESTERDAY }, "expired"],
+    [
+      "superseded",
+      { verifiedAt: YESTERDAY, supersededAt: NOW, tokenExpiresAt: NOW },
+      "superseded",
+    ],
+  ])("answers a %s challenge without a lookup", async (_name, facts, state) => {
+    getClaim.mockResolvedValue(record(facts));
     const resolveTxt = vi.fn();
     setResolver({ resolveTxt });
 
@@ -232,26 +223,7 @@ describe("POST /api/claims/:id/verify", () => {
     const body: ClaimView = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.state).toBe("expired");
-    expect(resolveTxt).not.toHaveBeenCalled();
-  });
-
-  it("will not let a superseded claim re-verify against its leftover record", async () => {
-    // Supersession expires the token in the same transaction, so the expiry
-    // guard is what actually stops the previous holder.
-    getClaim.mockResolvedValue(
-      record({
-        verifiedAt: YESTERDAY,
-        supersededAt: NOW,
-        tokenExpiresAt: NOW,
-      }),
-    );
-    const resolveTxt = vi.fn();
-    setResolver({ resolveTxt });
-
-    const body: ClaimView = await (await call()).json();
-
-    expect(body.state).toBe("superseded");
+    expect(body.state).toBe(state);
     expect(body.tookOverAt).toBeNull();
     expect(resolveTxt).not.toHaveBeenCalled();
     expect(verifyClaimAtomically).not.toHaveBeenCalled();

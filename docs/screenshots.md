@@ -38,6 +38,12 @@ A lookup that timed out or was refused. Nothing needs changing; the user retries
 
 ![Temporary DNS error](images/temporary-dns-error.jpg)
 
+## Held elsewhere
+
+The record matched, but another account holds the domain. Nothing has moved and nobody has been told; the transfer runs only on an explicit Take over. This one is the previous holder taking their domain back after being superseded, so the note above the alert names when it moved.
+
+![Held elsewhere, with the Take over button](images/held-elsewhere.png)
+
 ## Verified
 
 Verification is point in time. The record card is gone and the user is told the TXT value can be removed.
@@ -62,4 +68,4 @@ The confirmation says what deletion means: the domain is free for anyone who con
 
 ## Not pictured
 
-The takeover confirmation dialog, shown when a proof matches a domain another account holds, and the expired-code state. Both need a second account or a week-old token to reproduce.
+The takeover confirmation dialog that follows Take over, and the expired-code state, which needs a week-old token to reproduce.

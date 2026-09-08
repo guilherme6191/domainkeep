@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@/lib/api/client";
-import { claimView } from "@/test/claim-fixtures";
+import { NOW, claimView } from "@/test/claim-fixtures";
 
 const { useClaimMock } = vi.hoisted(() => ({ useClaimMock: vi.fn() }));
 
@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/hooks/use-claims", () => ({
   useClaim: useClaimMock,
   useVerifyClaim: () => ({ mutate: vi.fn(), isPending: false }),
+  useTakeOver: () => ({ mutate: vi.fn(), isPending: false }),
   useReplaceToken: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("@/components/domains/edit-domain-dialog", () => ({
@@ -79,6 +80,25 @@ describe("claim detail verified view", () => {
     expect(html).not.toContain("Generate a new code");
     expect(html).toContain("Delete domain control");
     expect(html).toContain("You can remove the");
+  });
+});
+
+describe("claim detail held by another account", () => {
+  // The proof already matched, so there is nothing left to check: the claim is
+  // asked to decide instead. Nothing has moved and nobody has been told yet.
+  it("offers Take over instead of another check", () => {
+    useClaimMock.mockReturnValue({
+      data: claimView({
+        state: "held_by_another",
+        lastCheck: { result: "held_by_another", checkedAt: NOW.toISOString() },
+      }),
+    });
+    const html = render();
+    expect(html).toContain("Take over");
+    expect(html).not.toContain("Check again");
+    expect(html).not.toContain("Verify domain");
+    expect(html).toContain("another account holds example.com");
+    expect(html).toContain("Generate a new code");
   });
 });
 

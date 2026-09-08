@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ import { DeleteDomainDialog } from "@/components/domains/delete-domain-dialog";
 import { DnsRecordCard } from "@/components/domains/dns-record-card";
 import { EditDomainDialog } from "@/components/domains/edit-domain-dialog";
 import { StatusBadge } from "@/components/domains/status-badge";
+import { TakeoverDialog } from "@/components/domains/takeover-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,27 +37,15 @@ function Meta({ label, iso }: { label: string; iso: string }) {
   );
 }
 
-/**
- * Shown beside every Verify button, never only when the domain is held. Making
- * it conditional would answer "is this domain taken?" for anyone who typed it
- * in, which is the disclosure the whole flow is built to withhold until there
- * is proof.
- */
-function TakeoverNote() {
-  return (
-    <p className="text-muted-foreground mr-auto max-w-[26rem] text-sm">
-      Verifying transfers the domain if another account holds it. If that
-      isn&rsquo;t expected, check with whoever manages it first.
-    </p>
-  );
-}
-
 export function ClaimDetail({ claimId }: { claimId: string }) {
   const router = useRouter();
   const { data: claim, isPending, isError, error, refetch, isFetching } =
     useClaim(claimId);
   const verify = useVerifyClaim(claimId);
   const replaceToken = useReplaceToken(claimId);
+  // Opened by the check that found the holder, and by the held panel's button
+  // on any later visit. The transfer itself is confirmed inside the dialog.
+  const [takeoverOpen, setTakeoverOpen] = useState(false);
 
   if (isPending) {
     return (
@@ -105,6 +95,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   // Read from the server's state, never from `tokenExpiresAt`: a verified claim
   // has no challenge, so its token's age means nothing here.
   const needsNewCode = claim.state === "expired" || claim.state === "superseded";
+  const isHeld = claim.state === "held_by_another";
   const checkedBefore = claim.lastCheck !== null;
   const verifyLabel = checkedBefore ? "Check again" : "Verify domain";
   const lastChecked = lastCheckedAt(claim);
@@ -115,6 +106,11 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
       onSuccess: (updated) => {
         if (updated.state === "verified") {
           toast.success(`You control ${updated.domain}.`);
+        }
+        // The proof matched but the domain is someone else's. Ask now, while
+        // the user is watching their own click.
+        if (updated.state === "held_by_another") {
+          setTakeoverOpen(true);
         }
       },
       onError: (error) => toastApiError(error),
@@ -138,52 +134,66 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     />
   );
 
-  // Verified has nothing left to do here; its delete control is in the header.
-  const actions = isVerified ? null : needsNewCode ? (
+  // The only way back for a claim whose code is dead, and an escape hatch
+  // beside every other pending action.
+  const newCode = (
     <Button
+      variant={needsNewCode ? "default" : "ghost"}
       size="sm"
+      title={
+        needsNewCode
+          ? undefined
+          : "Invalidates the current code. You'll need to update the TXT record."
+      }
       onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
       disabled={replaceToken.isPending}
     >
       {replaceToken.isPending ? "Generating…" : "Generate a new code"}
     </Button>
-  ) : (
-    <>
-      <TakeoverNote />
-      <Button
-        variant="ghost"
-        size="sm"
-        title="Invalidates the current code. You'll need to update the TXT record."
-        onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
-        disabled={replaceToken.isPending}
-      >
-        Generate a new code
-      </Button>
-      <Button size="sm" onClick={runVerify} disabled={verify.isPending}>
-        {/* Both labels share one grid cell so the button holds a single width
-            across the click. The footer wraps, and a wider pending label
-            pushed the buttons onto a second line. `invisible` keeps the
-            spare label out of the accessibility tree too. */}
-        <span className="grid place-items-center">
-          <span
-            className={cn(
-              "col-start-1 row-start-1",
-              verify.isPending && "invisible",
-            )}
-          >
-            {verifyLabel}
-          </span>
-          <span
-            className={cn(
-              "col-start-1 row-start-1 flex items-center gap-1",
-              !verify.isPending && "invisible",
-            )}
-          >
-            <Loader2 className="size-3.5 animate-spin" />
-            Checking…
-          </span>
+  );
+
+  const verifyButton = (
+    <Button size="sm" onClick={runVerify} disabled={verify.isPending}>
+      {/* Both labels share one grid cell so the button holds a single width
+          across the click. The footer wraps, and a wider pending label
+          pushed the buttons onto a second line. `invisible` keeps the
+          spare label out of the accessibility tree too. */}
+      <span className="grid place-items-center">
+        <span
+          className={cn(
+            "col-start-1 row-start-1",
+            verify.isPending && "invisible",
+          )}
+        >
+          {verifyLabel}
         </span>
-      </Button>
+        <span
+          className={cn(
+            "col-start-1 row-start-1 flex items-center gap-1",
+            !verify.isPending && "invisible",
+          )}
+        >
+          <Loader2 className="size-3.5 animate-spin" />
+          Checking…
+        </span>
+      </span>
+    </Button>
+  );
+
+  // Verified has nothing left to do here; its delete control is in the header.
+  // A dead code leaves only its replacement. Otherwise one primary action sits
+  // beside it: a claim that has already proved control is asked to decide,
+  // every other one to check.
+  const actions = isVerified ? null : (
+    <>
+      {newCode}
+      {needsNewCode ? null : isHeld ? (
+        <Button size="sm" onClick={() => setTakeoverOpen(true)}>
+          Take over
+        </Button>
+      ) : (
+        verifyButton
+      )}
     </>
   );
 
@@ -256,6 +266,13 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           footer={actions}
         />
       )}
+
+      <TakeoverDialog
+        claimId={claim.id}
+        domain={claim.domain}
+        open={takeoverOpen}
+        onOpenChange={setTakeoverOpen}
+      />
     </div>
   );
 }

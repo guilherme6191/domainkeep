@@ -163,6 +163,33 @@ export function ExpectedVsFoundCard({
   );
 }
 
+/**
+ * Carries the same neutral colour as the diagnostic panels, because it is the
+ * outcome of a check like any of them — but what it asks for is a decision
+ * rather than a fix. The Take over button lives in the card footer below,
+ * beside Generate a new code.
+ */
+function HeldByAnother({ claim }: { claim: ClaimView }) {
+  return (
+    <Alert>
+      <AlertCircle />
+      <AlertTitle>
+        Your record matched, but another account holds {claim.domain}.
+      </AlertTitle>
+      <AlertDescription className="space-y-2">
+        <p>
+          Nothing has moved and nobody has been told. Take it over and the
+          domain becomes yours, and the other account is told it moved.
+        </p>
+        <p>
+          If that isn&rsquo;t expected, check with whoever manages the domain
+          first.
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function TemporaryDnsError() {
   return (
     <Alert>
@@ -232,9 +259,9 @@ function Superseded({ claim }: { claim: ClaimView }) {
         {claim.verifiedAt
           ? `You verified this domain on ${formatDateTimeSentence(claim.verifiedAt)}, and it has since moved. `
           : null}
-        If you still control its DNS, generate a new code and verify again to
-        take it back. Check with whoever manages this domain first on who should
-        hold it.
+        If you still control its DNS, generate a new code and verify again —
+        you&rsquo;ll be asked to confirm before it moves back. Check with
+        whoever manages this domain first on who should hold it.
       </AlertDescription>
     </Alert>
   );
@@ -245,8 +272,8 @@ function SupersededNote({ claim }: { claim: ClaimView }) {
   return (
     <p className="text-sm text-red-300/90">
       This domain moved to another account on{" "}
-      {formatDateTimeSentence(claim.supersededAt)}. Verifying again takes it
-      back.
+      {formatDateTimeSentence(claim.supersededAt)}. Verifying proves control
+      again; taking it back is a separate confirmation.
     </p>
   );
 }
@@ -272,6 +299,8 @@ function statePanel(claim: ClaimView) {
       return <ValueMismatch />;
     case "temporary_dns_error":
       return <TemporaryDnsError />;
+    case "held_by_another":
+      return <HeldByAnother claim={claim} />;
     case "expired":
       return <Expired />;
     case "verified":

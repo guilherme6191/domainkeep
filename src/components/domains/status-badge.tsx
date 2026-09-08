@@ -8,18 +8,20 @@ type Presentation = {
   className?: string;
 };
 
-// The badge collapses seven states into four labels by what the user does next:
-// nothing, start, open and fix, or open and learn the domain moved. Every
-// pending-with-a-fix state shares one "Needs attention" label. The detail page
-// names the exact state.
+// The badge collapses eight states into five labels by what the user does next:
+// nothing, start, open and fix, open and decide, or open and learn the domain
+// moved. Every pending-with-a-fix state shares one "Needs attention" label. The
+// detail page names the exact state.
 // Amber means "open this", not proof of a mistake: the cause may be propagation,
-// a configuration issue, a lookup failure, or an expired challenge. Red is
-// reserved for superseded, the one state that changed against the user and has
-// no one-click fix.
+// a configuration issue, a lookup failure, an expired challenge, or a domain
+// that proved to be someone else's. Red is reserved for superseded, the one
+// state that changed against the user and has no one-click fix.
+const AMBER = "border-amber-400/35 bg-amber-500/15 text-amber-300";
+
 const NEEDS_ATTENTION: Presentation = {
   label: "Needs attention",
   variant: "outline",
-  className: "border-amber-400/35 bg-amber-500/15 text-amber-300",
+  className: AMBER,
 };
 
 const PRESENTATION: Record<ClaimViewState, Presentation> = {
@@ -38,6 +40,13 @@ const PRESENTATION: Record<ClaimViewState, Presentation> = {
     label: "Unchecked",
     variant: "outline",
     className: "text-muted-foreground",
+  },
+  // Not "needs attention": nothing is broken, and the next step is a decision
+  // rather than a fix.
+  held_by_another: {
+    label: "Held elsewhere",
+    variant: "outline",
+    className: AMBER,
   },
   record_not_found: NEEDS_ATTENTION,
   value_mismatch: NEEDS_ATTENTION,

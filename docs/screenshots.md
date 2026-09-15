@@ -1,6 +1,6 @@
 # Screenshots
 
-Every screen a user can reach, for reviewers who would rather look than sign up. Captured from the deployed build on 2026-09-08.
+Every screen a user can reach, for anyone who would rather look than sign up. Captured from the deployed build on 2026-09-08.
 
 ## The domains list
 

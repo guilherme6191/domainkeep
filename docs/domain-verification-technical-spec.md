@@ -4,7 +4,7 @@
 
 **Status:** Complete, open to iteration
 **Date:** September 7, 2026
-**Related documents:** [Product brief](domain-verification-product-brief.md) · [Challenge description](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153)
+**Related documents:** [Product brief](domain-verification-product-brief.md)
 
 This spec owns architecture, contracts, persistence, and security. The [brief](domain-verification-product-brief.md) owns product intent and scope; the [README](../README.md#tradeoffs-and-limitations) explains tradeoffs.
 

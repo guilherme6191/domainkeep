@@ -4,8 +4,8 @@
 
 **Status:** Complete, open to iteration
 **Date:** September 7, 2026
-**Delivery window:** One week
-**Related documents:** [README](../README.md) · [Technical specification](domain-verification-technical-spec.md) · [Challenge description](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153)
+**Timebox:** One week
+**Related documents:** [README](../README.md) · [Technical specification](domain-verification-technical-spec.md)
 
 This brief owns the user problem, product rules, and scope. Mechanisms live in the [technical specification](domain-verification-technical-spec.md); tradeoff reasoning lives in the [README](../README.md#tradeoffs-and-limitations).
 
@@ -76,7 +76,7 @@ The transfer flow is inspired by [Resend Domain Claim](https://resend.com/docs/d
 
 - Correct a domain only if it has never verified; otherwise delete it and add the corrected domain. Deletion is permanent and does not change DNS
 - Attempt a privacy-safe email to the previous holder through Resend after each takeover, including repeat losses. Delivery is best-effort: missing configuration skips sending, and failed sends are not retried. The superseded claim remains the in-app signal
-- Provide polished setup documentation and a short demo
+- Provide polished setup documentation and a screenshot walkthrough
 
 ### Out of scope
 

@@ -1,30 +1,16 @@
 # Domain Ownership Verification
 
-Domainkeep is a domain claiming product, built for the [Resend Product Engineer challenge](https://resend.notion.site/Product-engineer-36dc40d6c4ef80d5a962f37bbd39c153). A user enters a domain they control, publishes one TXT record at that name with the value `resend-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, held by another account, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
+Domainkeep is a domain claiming product. A user enters a domain they control, publishes one TXT record at that name with the value `resend-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, held by another account, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
 
 A verified claim can be superseded by another account's fresh DNS proof, once that account confirms the takeover.
 
 **Live app:** [https://domainkeep.vercel.app](https://domainkeep.vercel.app) — sign up with any email, add a domain whose DNS you can edit, and follow the on-screen instructions.
 
-**Demo video:** [https://www.loom.com/share/df7d209e33044e7090dc277a400afe73](https://www.loom.com/share/df7d209e33044e7090dc277a400afe73)
-
-The recording ends just as I was about to show the final states of a takeover, so here they are as screenshots. The previous holder's list, with `recomendei.me` now Superseded:
-
-![The domains list, with recomendei.me marked Superseded](docs/images/superseded-in-list.png)
-
-The same claim opened, naming what happened, when, and the way back:
-
-![The superseded claim's detail page](docs/images/superseded-detail.png)
-
-And the email that previous holder received, sent with Resend, explaining what happened and how to take the domain back:
-
-![The takeover notice email](docs/images/takeover-email.png)
-
-Want to see more of the UI without signing up? Every state is pictured in [docs/screenshots.md](docs/screenshots.md).
+Want to see the UI without signing up? Every screen and claim state is pictured in [docs/screenshots.md](docs/screenshots.md).
 
 ## How failure and recovery work
 
-The challenge asks for a workflow a user can understand, watch fail, and fix. Three choices carry that:
+The goal is a workflow a user can understand, watch fail, and fix. Three choices carry that:
 
 - **Each outcome names its fix.** Record not found, value mismatch, and DNS not answering are separate states with separate next steps: check the name, compare the value, or wait and retry. A mismatch shows the expected value beside what DNS actually returned.
 - **Retrying keeps the code; replacing it is deliberate.** Check again reuses the token until expiry. A missing record may need time or a configuration correction, not a new code. Generate a new code is a separate action that invalidates the old value.
@@ -32,13 +18,13 @@ The challenge asks for a workflow a user can understand, watch fail, and fix. Th
 
 ## Tradeoffs and limitations
 
-- **Authentication is required, through Clerk.** Although optional for the challenge, durable accounts and user objects are what a domain/user association hangs on: they make competing claims meaningful and give the previous holder somewhere to receive feedback. Clerk keeps that overhead out of the exercise. The cost is a sign-up step before anything else; open email sign-up keeps it from becoming a barrier for reviewers.
+- **Authentication is required, through Clerk.** Durable accounts and user objects are what a domain/user association hangs on: they make competing claims meaningful and give the previous holder somewhere to receive feedback. Clerk keeps that overhead small. The cost is a sign-up step before anything else; open email sign-up keeps it from becoming a barrier.
 - **One TXT record, at the exact name claimed.** Exact-name verification supports delegated subdomains and keeps the proof unambiguous. The cost is that verifying a parent does not cover its children, and users need enough DNS knowledge to place the record correctly; the record card shows both the provider-style name and the full hostname to close that gap.
 - **A newer proof can take the domain over, and neither side learns who.** Fresh DNS proof supports ownership changes, team migrations, and agency handoffs without support tickets. The cost is that people sharing DNS access can transfer a domain back and forth. Both sides are told: the winner sees a takeover note, the previous holder sees a superseded claim and gets an email through Resend. Neither learns the other's identity: the product resolves control, not intent. Transfer cooldowns and dispute handling are deferred.
 - **Verification is point in time.** A check records control at that moment, and the TXT record is not required afterwards, so users can clean up their zone. The cost is that a claim stays verified after DNS control is lost until someone deletes it or proves control anew. Automatic rechecks and revocation rules are deferred.
 - **A takeover happens only when the user confirms it.** Verifying proves control; it never moves a domain by itself. If the proof matches and another account holds the domain, the user is told and asked, and the transfer runs only on an explicit **Take over** — after a fresh DNS check, so control is proved in the request that acts on it. Nothing verifies outside a click either: no server polling, no background job, no automatic retry, so a transfer can never land at 3am with nobody watching. The cost is one extra step in the rare shared-domain case, and that when propagation is slow the user has to come back and check again; a TXT lookup is usually fast and retries are cheap, so that wait stays short.
 - **Correction is narrow, deletion is final.** A domain can be edited only while it has never verified, which covers the typo case; after that, the user deletes it and adds the corrected one. Deletion is immediate and permanent, so a verified domain is free again at once. The cost is that no history survives.
-- **No rate limiting or attempt history.** Checks are unbounded and only the latest result is kept. Both are deferred: they would add complexity without much value for this exercise.
+- **No rate limiting or attempt history.** Checks are unbounded and only the latest result is kept. Both are deferred: they would add complexity without much value at this scale.
 
 ## Claim states
 
@@ -92,11 +78,9 @@ pnpm db:migrate              # 2. create the schema
 pnpm dev                     # 3. http://localhost:3000
 ```
 
-For easy local dev, feel free to get the env vars from me to reuse my clerk and supabase instances.
-
 Then sign up, add a domain you control, publish the TXT record it shows you, and click **Verify domain**. The check is a real public DNS lookup, so it has to be a domain whose zone you can edit.
 
-No credentials or the original env vars? The [local development guide](LOCAL-DEVELOPMENT.md) walks through creating the free Clerk application and Supabase project the app needs, and lists every variable in `.env.local`.
+No credentials yet? The [local development guide](LOCAL-DEVELOPMENT.md) walks through creating the free Clerk application and Supabase project the app needs, and lists every variable in `.env.local`.
 
 ## Testing
 
@@ -115,5 +99,5 @@ pnpm lint
 | Document | What it covers |
 | --- | --- |
 | [Local development](LOCAL-DEVELOPMENT.md) | Running the app locally, with the Clerk and Supabase setup and the environment reference. |
-| [Screenshots](docs/screenshots.md) | Every screen and claim state, for reviewers who would rather look than sign up. |
+| [Screenshots](docs/screenshots.md) | Every screen and claim state, for anyone who would rather look than sign up. |
 | [docs/](docs/) | Product brief and technical specification: principles, scope, API contracts, state modeling, persistence, and security. |

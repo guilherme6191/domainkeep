@@ -40,13 +40,13 @@ The README's [Tradeoffs and limitations](README.md#tradeoffs-and-limitations) se
 
 ## Building and iterating
 
-The brief and spec came first and were revised twice before any application code: once to refine the definitions, and once to settle the root TXT record, click-only checks, the list labels, and the takeover email. The application landed on the third day, and most of the remaining time went to what running it against live DNS taught.
+The brief and spec came first and were revised before any application code, settling the root TXT record, click-only checks, the list labels, and the takeover email. The application landed on the third day, and most of the remaining time went to what running it against live DNS taught.
 
 - **The record Name field.** Every claim first showed `@` in the Name column. For a subdomain, someone editing the parent zone pastes that, publishes at the apex, and gets record-not-found. Providers take the label relative to the zone and append the rest themselves, so the card now shows that relative label, with the full hostname spelled out underneath as the invariant to check against.
 - **Copying the value.** The table shows a short form of the token, and the clipboard sometimes refuses. The copy button carries the full value, a refused copy raises a toast, and a popover exposes the whole value for manual selection.
 - **Verified claims dropped the record card.** Once the proof is complete the TXT value has no ongoing job, so the verified panel tells the user they may remove it instead of showing it. Decisions moved from token age to the derived state, so the client never reads the expiry to decide anything.
 - **Takeover became a question.** The latest design change was to stop a matching proof from moving a held domain by itself. Verifying now reports that the domain is held elsewhere, and the transfer waits for an explicit confirmation and a fresh lookup. The brief, spec, and README were updated to match.
-- **The list grew up.** Pagination from the URL, row selection, and bulk delete arrived once there were enough domains to need them, along with server rendering of the first page and the same retry path the detail page already had.
+- **The list grew up.** Pagination from the URL, row selection, and bulk delete arrived, along with server rendering of the first page and the same retry path the detail page already had.
 - **Copy was trimmed** to one idea per state, and red was reserved for superseded claims so the previous holder's signal stands out.
 
 [TODO: owner] Anything the commit history does not show: what surprised you, what you would do differently, and what you would build next.

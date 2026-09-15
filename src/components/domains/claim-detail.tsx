@@ -21,12 +21,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useClaim, useReplaceToken, useVerifyClaim } from "@/hooks/use-claims";
 import { ApiRequestError } from "@/lib/api/client";
 import { toastApiError } from "@/lib/api/toast-error";
-import { lastCheckedAt } from "@/lib/claim-state";
+import { codeExpiryIsUrgent, lastCheckedAt } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { ClaimView } from "@/lib/types";
+import type { ClaimView, ClaimViewState } from "@/lib/types";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+// What a screen reader hears when a check settles. The panels announce
+// themselves when they mount, but a second miss re-renders the same panel
+// and says nothing, so the result is spoken here every time.
+const OUTCOME: Record<ClaimViewState, string> = {
+  verified: "Verified. You control this domain.",
+  record_not_found: "Record not found yet. DNS may still be propagating.",
+  value_mismatch: "Record found, but its value doesn't match.",
+  temporary_dns_error: "DNS didn't respond. Nothing to change yet.",
+  held_by_another: "Your record matched, but another account holds this domain.",
+  expired: "This verification code has expired.",
+  superseded: "Another account proved control of this domain.",
+  setup_required: "Not checked yet.",
+};
 
 // Relative time, with the exact instant on hover.
 function Meta({
@@ -60,8 +72,7 @@ function CodeExpiry({ claim }: { claim: ClaimView }) {
   if (claim.state === "verified") return null;
 
   const dead = claim.state === "expired" || claim.state === "superseded";
-  const remainingMs = new Date(claim.tokenExpiresAt).getTime() - Date.now();
-  const urgent = dead || remainingMs < DAY_MS;
+  const urgent = codeExpiryIsUrgent(claim);
 
   return (
     <Meta
@@ -88,6 +99,10 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   // Opened by the check that found the holder, and by the held panel's button
   // on any later visit. The transfer itself is confirmed inside the dialog.
   const [takeoverOpen, setTakeoverOpen] = useState(false);
+  // Counts settled checks so a result can animate in without the first paint
+  // doing the same, and so a repeated outcome still gets a fresh panel.
+  const [checks, setChecks] = useState(0);
+  const [announcement, setAnnouncement] = useState("");
 
   if (isPending) {
     return (
@@ -143,19 +158,24 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   const lastChecked = lastCheckedAt(claim);
   const showComparison = claim.state === "value_mismatch";
 
+  // The verified panel is the confirmation; a toast saying the same thing at
+  // the same moment would be noise.
   function runVerify() {
+    setAnnouncement("Checking DNS…");
     verify.mutate(undefined, {
       onSuccess: (updated) => {
-        if (updated.state === "verified") {
-          toast.success(`You control ${updated.domain}.`);
-        }
+        setChecks((count) => count + 1);
+        setAnnouncement(OUTCOME[updated.state]);
         // The proof matched but the domain is someone else's. Ask now, while
         // the user is watching their own click.
         if (updated.state === "held_by_another") {
           setTakeoverOpen(true);
         }
       },
-      onError: (error) => toastApiError(error),
+      onError: (error) => {
+        setAnnouncement("The check didn't run. Try again.");
+        toastApiError(error);
+      },
     });
   }
 
@@ -291,20 +311,38 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         </CardContent>
       </Card>
 
-      <ClaimStatePanel claim={claim} />
+      <p className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </p>
 
-      {/* Verification is point-in-time, so a verified claim has no record to
-          show: the proof is done and the TXT value has no ongoing job. */}
-      {isVerified ? null : showComparison ? (
-        <ExpectedVsFoundCard claim={claim} />
-      ) : (
-        <DnsRecordCard
-          value={claim.recordValue}
-          hostname={claim.verificationHostname}
-          title={needsNewCode ? "Previous record" : "Add this DNS record"}
-          inactive={needsNewCode}
-        />
-      )}
+      {/* Keyed on the check count, not the state: a repeat miss should still
+          visibly answer the click. The whole block dims while a check is in
+          flight, so the page shows work in progress, not a stuck button. */}
+      <div
+        key={checks}
+        aria-busy={verify.isPending || undefined}
+        className={cn(
+          "space-y-5 transition-opacity duration-300",
+          checks > 0 &&
+            "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 motion-safe:duration-300",
+          verify.isPending && "opacity-60",
+        )}
+      >
+        <ClaimStatePanel claim={claim} />
+
+        {/* Verification is point-in-time, so a verified claim has no record to
+            show: the proof is done and the TXT value has no ongoing job. */}
+        {isVerified ? null : showComparison ? (
+          <ExpectedVsFoundCard claim={claim} />
+        ) : (
+          <DnsRecordCard
+            value={claim.recordValue}
+            hostname={claim.verificationHostname}
+            title={needsNewCode ? "Previous record" : "Add this DNS record"}
+            inactive={needsNewCode}
+          />
+        )}
+      </div>
 
       <TakeoverDialog
         claimId={claim.id}

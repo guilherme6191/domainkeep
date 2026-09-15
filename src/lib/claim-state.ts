@@ -58,3 +58,18 @@ export function lastCheckedAt(
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, iso) => (iso > latest ? iso : latest));
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether the code deserves the user's attention now: already dead, or
+ * inside its last day, when a record published today may stop counting
+ * before DNS has finished propagating it.
+ */
+export function codeExpiryIsUrgent(
+  claim: Pick<ClaimView, "state" | "tokenExpiresAt">,
+  now: Date = new Date(),
+): boolean {
+  if (claim.state === "expired" || claim.state === "superseded") return true;
+  return new Date(claim.tokenExpiresAt).getTime() - now.getTime() < DAY_MS;
+}

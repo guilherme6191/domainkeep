@@ -116,7 +116,7 @@ export function ExpectedVsFoundCard({
               <CopyButton
                 value={claim.recordValue}
                 label="expected value"
-                className="size-7 shrink-0"
+                className="size-6 shrink-0"
               />
             </div>
           </div>

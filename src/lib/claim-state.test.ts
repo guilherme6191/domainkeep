@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  codeExpiryIsUrgent,
   getClaimViewState,
   isCurrentlyVerified,
   lastCheckedAt,
@@ -130,5 +131,20 @@ describe("lastCheckedAt", () => {
     ["superseded, never checked since", { state: "superseded", verifiedAt: VERIFIED, lastCheck: null }, VERIFIED],
   ] as const)("%s", (_name, view, expected) => {
     expect(lastCheckedAt(view)).toBe(expected);
+  });
+});
+
+describe("codeExpiryIsUrgent", () => {
+  const hours = (n: number) => new Date(NOW.getTime() + n * 3600_000).toISOString();
+
+  it.each([
+    ["a fresh week", { state: "setup_required", tokenExpiresAt: hours(6 * 24) }, false],
+    ["just over a day left", { state: "record_not_found", tokenExpiresAt: hours(25) }, false],
+    ["inside the last day", { state: "record_not_found", tokenExpiresAt: hours(23) }, true],
+    ["expired", { state: "expired", tokenExpiresAt: hours(-1) }, true],
+    // Dead by state, whatever the timestamp says.
+    ["superseded", { state: "superseded", tokenExpiresAt: hours(6 * 24) }, true],
+  ] as const)("%s", (_name, view, expected) => {
+    expect(codeExpiryIsUrgent(view, NOW)).toBe(expected);
   });
 });

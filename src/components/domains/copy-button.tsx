@@ -55,7 +55,7 @@ export function CopyButton({
         }}
       >
         {copied ? (
-          <Check className="size-3.5 text-emerald-500" />
+          <Check className="size-3.5 text-emerald-400 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-200" />
         ) : (
           <Copy className="size-3.5" />
         )}

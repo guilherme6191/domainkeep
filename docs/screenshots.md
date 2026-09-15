@@ -44,6 +44,16 @@ A code past its seven days. The previous record is shown struck through for refe
 
 ![An expired code with its previous record](images/expired.jpg)
 
+## Held elsewhere
+
+The record matched, but another account holds the domain. Nothing has moved and nobody has been told; the transfer runs only on an explicit Take over. This one is the previous holder taking their domain back after being superseded, so the note above the alert names when it moved.
+
+![Held elsewhere, with the Take over button](images/held-elsewhere.jpg)
+
+The confirmation that follows. Cancelling sends nothing; the other account learns of the transfer only if the user goes ahead.
+
+![The Take over confirmation dialog](images/takeover-dialog.jpg)
+
 ## Verified
 
 Verification is point in time. The record card is gone and the user is told the TXT value can be removed.
@@ -66,4 +76,4 @@ The confirmation says what deletion means: the domain is free for anyone who con
 
 ## Not pictured
 
-Held elsewhere with its Take over dialog, and the notice email the previous holder receives.
+The notice email the previous holder receives after a takeover.

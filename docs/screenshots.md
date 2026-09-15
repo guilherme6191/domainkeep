@@ -50,6 +50,14 @@ Verification is point in time. The record card is gone and the user is told the 
 
 ![A verified domain](images/verified.jpg)
 
+## Superseded
+
+The previous holder's view after another account proved control: the row in their list, and the claim itself with the date, the invalidated code, and the way back.
+
+![The domains list, with recomendei.me marked Superseded](images/superseded-in-list.jpg)
+
+![The superseded claim's detail page](images/superseded-detail.jpg)
+
 ## Deleting a verified domain
 
 The confirmation says what deletion means: the domain is free for anyone who controls its DNS.
@@ -58,4 +66,4 @@ The confirmation says what deletion means: the domain is free for anyone who con
 
 ## Not pictured
 
-Held elsewhere with its Take over dialog, and the previous holder's superseded view with the notice email. Both need a second account to reproduce.
+Held elsewhere with its Take over dialog, and the notice email the previous holder receives.

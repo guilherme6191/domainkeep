@@ -76,7 +76,7 @@ The transfer flow is inspired by [Resend Domain Claim](https://resend.com/docs/d
 
 - Correct a domain only if it has never verified; otherwise delete it and add the corrected domain. Deletion is permanent and does not change DNS
 - Attempt a privacy-safe email to the previous holder through Resend after each takeover, including repeat losses. Delivery is best-effort: missing configuration skips sending, and failed sends are not retried. The superseded claim remains the in-app signal
-- Provide polished setup documentation and a screenshot walkthrough
+- Provide polished setup documentation
 
 ### Out of scope
 

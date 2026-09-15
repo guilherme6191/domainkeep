@@ -8,8 +8,6 @@ A verified claim can be superseded by another account's fresh DNS proof, once th
 
 **How it was built:** [PROCESS.md](PROCESS.md) walks through the problem, the scoping, and the design decisions.
 
-Want to see the UI without signing up? Every screen and claim state is pictured in [docs/screenshots.md](docs/screenshots.md).
-
 ## How failure and recovery work
 
 The goal is a workflow a user can understand, watch fail, and fix. Three choices carry that:
@@ -101,5 +99,4 @@ pnpm lint
 | Document | What it covers |
 | --- | --- |
 | [Local development](LOCAL-DEVELOPMENT.md) | Running the app locally, with the Clerk and Supabase setup and the environment reference. |
-| [Screenshots](docs/screenshots.md) | Every screen and claim state, for anyone who would rather look than sign up. |
 | [docs/](docs/) | Product brief and technical specification: principles, scope, API contracts, state modeling, persistence, and security. |

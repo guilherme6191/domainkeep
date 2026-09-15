@@ -133,6 +133,18 @@
   html {
     @apply font-sans;
   }
+
+  /* Motion is decoration here, never information: every enter, exit and
+     transition collapses to an instant cut when the user has asked for less. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 .cl-formFieldInput__emailAddress:focus {

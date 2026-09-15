@@ -27,22 +27,34 @@ import {
 import { lastCheckedAt } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { type PageSize } from "@/lib/pagination";
+import { cn } from "@/lib/utils";
 import type { ClaimPage, ClaimView } from "@/lib/types";
 
 // Column headings sit a step below the data in size and colour, so the eye
 // lands on the rows, not the labels.
 const HEAD = "text-muted-foreground text-xs font-medium";
 
+// On a phone the table keeps the name, the status and the menu; the two
+// timestamps return as the viewport widens, most recent first. Nothing
+// scrolls sideways.
+const LAST_CHECKED = "hidden sm:table-cell";
+const ADDED = "hidden md:table-cell";
+
 function LastCheckedCell({ iso }: { iso: string | null }) {
   if (!iso) {
     return (
-      <TableCell className="text-muted-foreground/60" aria-label="Never checked">
+      <TableCell
+        className={cn(LAST_CHECKED, "text-muted-foreground/60")}
+        aria-label="Never checked"
+      >
         Never
       </TableCell>
     );
   }
   return (
-    <TableCell title={formatDateTime(iso)}>{formatRelative(iso)}</TableCell>
+    <TableCell className={LAST_CHECKED} title={formatDateTime(iso)}>
+      {formatRelative(iso)}
+    </TableCell>
   );
 }
 
@@ -137,10 +149,10 @@ export function DomainsTable({
                 aria-label="Select all on this page"
               />
             </TableHead>
-            <TableHead className={HEAD}>Domain</TableHead>
+            <TableHead className={cn(HEAD, "w-full")}>Domain</TableHead>
             <TableHead className={HEAD}>Status</TableHead>
-            <TableHead className={HEAD}>Last checked</TableHead>
-            <TableHead className={HEAD}>Added</TableHead>
+            <TableHead className={cn(HEAD, LAST_CHECKED)}>Last checked</TableHead>
+            <TableHead className={cn(HEAD, ADDED)}>Added</TableHead>
             <TableHead className="w-12 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -159,10 +171,13 @@ export function DomainsTable({
                   aria-label={`Select ${claim.domain}`}
                 />
               </TableCell>
-              <TableCell className="font-mono text-[13px]">
+              <TableCell className="w-full max-w-0 font-mono text-[13px]">
+                {/* Takes whatever width the other columns leave; a long name
+                    truncates and keeps its full text on hover. */}
                 <Link
                   href={`/domains/${claim.id}`}
-                  className="focus-visible:ring-ring/50 rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3"
+                  title={claim.domain}
+                  className="focus-visible:ring-ring/50 block truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3"
                 >
                   {claim.domain}
                 </Link>
@@ -172,7 +187,7 @@ export function DomainsTable({
               </TableCell>
               <LastCheckedCell iso={lastCheckedAt(claim)} />
               <TableCell
-                className="text-muted-foreground"
+                className={cn(ADDED, "text-muted-foreground")}
                 title={formatDateTime(claim.createdAt)}
               >
                 {formatRelative(claim.createdAt)}

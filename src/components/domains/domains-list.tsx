@@ -54,18 +54,39 @@ export function DomainsList({
     }
   }, [data, isPlaceholderData, page, pageCount, pageSize, router]);
 
+  // Same bones as the loaded page: the title block, the two controls, then
+  // a table-shaped frame with a header band and a few rows, so nothing jumps
+  // when the data lands.
   if (isPending) {
     return (
-      <div className="space-y-6">
-        {/* Same row as the loaded header: title left, add and menu right. */}
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-9 w-40" />
+      <div className="space-y-6" aria-busy>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-4 w-80" />
+          </div>
           <div className="flex items-center gap-2">
-            <Skeleton className="h-9 w-28" />
-            <Skeleton className="size-9" />
+            <Skeleton className="h-8 w-28" />
+            <Skeleton className="size-8" />
           </div>
         </div>
-        <Skeleton className="h-40 w-full" />
+        <div className="overflow-hidden rounded-xl border">
+          <div className="border-b px-4 py-3">
+            <Skeleton className="h-4 w-1/3" />
+          </div>
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="flex items-center gap-6 border-b px-4 py-4 last:border-0">
+              <Skeleton className="size-4" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-5 w-20 rounded-4xl" />
+              <Skeleton className="ml-auto h-4 w-24" />
+            </div>
+          ))}
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
       </div>
     );
   }

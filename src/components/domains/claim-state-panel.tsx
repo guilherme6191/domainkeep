@@ -6,6 +6,10 @@ import {
   AlertTriangle,
   ChevronRight,
   CircleCheck,
+  CloudOff,
+  Hourglass,
+  Lock,
+  SearchX,
 } from "lucide-react";
 import { CopyButton } from "@/components/domains/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -27,12 +31,15 @@ function Mono({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Each outcome has its own glyph, so the shape says what happened before the
+// words do: nothing found, a mismatch, no answer, someone else, out of time.
+
 // The first miss is usually propagation, so the checklist stays folded until
 // the user wants it.
 function RecordNotFound({ claim }: { claim: ClaimView }) {
   return (
     <Alert>
-      <AlertCircle />
+      <SearchX />
       <AlertTitle>We couldn&rsquo;t find the verification record yet.</AlertTitle>
       <AlertDescription className="space-y-3">
         <p>
@@ -41,7 +48,7 @@ function RecordNotFound({ claim }: { claim: ClaimView }) {
         </p>
 
         <details className="group">
-          <summary className="text-foreground flex cursor-pointer list-none items-center gap-1 font-medium [&::-webkit-details-marker]:hidden">
+          <summary className="text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm font-medium outline-none focus-visible:ring-3 [&::-webkit-details-marker]:hidden">
             <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
             Still missing after a while?
           </summary>
@@ -173,7 +180,7 @@ export function ExpectedVsFoundCard({
 function HeldByAnother({ claim }: { claim: ClaimView }) {
   return (
     <Alert>
-      <AlertCircle />
+      <Lock />
       <AlertTitle>
         Your record matched, but another account holds {claim.domain}.
       </AlertTitle>
@@ -194,7 +201,7 @@ function HeldByAnother({ claim }: { claim: ClaimView }) {
 function TemporaryDnsError() {
   return (
     <Alert>
-      <AlertCircle />
+      <CloudOff />
       <AlertTitle>
         DNS didn&rsquo;t respond. Your record may still be correct.
       </AlertTitle>
@@ -209,7 +216,7 @@ function TemporaryDnsError() {
 function Expired() {
   return (
     <Alert>
-      <AlertCircle />
+      <Hourglass />
       <AlertTitle>This verification code has expired.</AlertTitle>
       <AlertDescription>Codes are valid for seven days.</AlertDescription>
     </Alert>

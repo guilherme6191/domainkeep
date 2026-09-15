@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -24,16 +24,58 @@ import { toastApiError } from "@/lib/api/toast-error";
 import { lastCheckedAt } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { ClaimView } from "@/lib/types";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Relative time, with the exact instant on hover.
-function Meta({ label, iso }: { label: string; iso: string }) {
+function Meta({
+  label,
+  iso,
+  className,
+  icon,
+}: {
+  label: string;
+  iso: string;
+  className?: string;
+  icon?: React.ReactNode;
+}) {
   return (
-    <div className="space-y-1">
-      <div className="text-muted-foreground text-sm">{label}</div>
-      <div className="text-sm" title={formatDateTime(iso)}>
+    <div className={cn("flex items-center gap-1.5", className)}>
+      {icon}
+      <dt>{label}</dt>
+      <dd className="text-foreground" title={formatDateTime(iso)}>
         {formatRelative(iso)}
-      </div>
+      </dd>
     </div>
+  );
+}
+
+/**
+ * The one piece of metadata that is a deadline rather than history. It stays
+ * quiet for most of the week and turns amber inside the last day, when the
+ * user should act on it before the record they published stops counting.
+ */
+function CodeExpiry({ claim }: { claim: ClaimView }) {
+  if (claim.state === "verified") return null;
+
+  const dead = claim.state === "expired" || claim.state === "superseded";
+  const remainingMs = new Date(claim.tokenExpiresAt).getTime() - Date.now();
+  const urgent = dead || remainingMs < DAY_MS;
+
+  return (
+    <Meta
+      label={
+        claim.state === "superseded"
+          ? "Code invalidated"
+          : dead
+            ? "Code expired"
+            : "Code expires"
+      }
+      iso={claim.tokenExpiresAt}
+      icon={<Clock className="size-3.5" aria-hidden />}
+      className={cn(urgent && "text-amber-300 [&_dd]:text-amber-300")}
+    />
   );
 }
 
@@ -55,7 +97,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-8 w-28" />
         </div>
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />
       </div>
     );
@@ -117,6 +159,8 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     });
   }
 
+  // Quiet in the top bar: deletion is rare, and it should never outweigh the
+  // check. It turns red only under the pointer.
   const deleteDomain = (
     <DeleteDomainDialog
       claimId={claim.id}
@@ -127,7 +171,11 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         router.push("/domains");
       }}
       trigger={
-        <Button variant="outline" size="sm">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-destructive -mr-2 h-8"
+        >
           Delete domain
         </Button>
       }
@@ -139,7 +187,6 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   const newCode = (
     <Button
       variant={needsNewCode ? "default" : "ghost"}
-      size="sm"
       title={
         needsNewCode
           ? undefined
@@ -153,11 +200,10 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   );
 
   const verifyButton = (
-    <Button size="sm" onClick={runVerify} disabled={verify.isPending}>
+    <Button onClick={runVerify} disabled={verify.isPending}>
       {/* Both labels share one grid cell so the button holds a single width
-          across the click. The footer wraps, and a wider pending label
-          pushed the buttons onto a second line. `invisible` keeps the
-          spare label out of the accessibility tree too. */}
+          across the click. `invisible` keeps the spare label out of the
+          accessibility tree too. */}
       <span className="grid place-items-center">
         <span
           className={cn(
@@ -169,7 +215,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         </span>
         <span
           className={cn(
-            "col-start-1 row-start-1 flex items-center gap-1",
+            "col-start-1 row-start-1 flex items-center gap-1.5",
             !verify.isPending && "invisible",
           )}
         >
@@ -180,17 +226,16 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     </Button>
   );
 
-  // Verified has nothing left to do here; its delete control is in the header.
-  // A dead code leaves only its replacement. Otherwise one primary action sits
-  // beside it: a claim that has already proved control is asked to decide,
-  // every other one to check.
+  // The primary action sits in the header beside the status it acts on, so
+  // the page reads status, then what to do about it, then how. Verified has
+  // nothing left to do. A dead code leaves only its replacement. Otherwise
+  // one primary action stands beside the escape hatch: a claim that has
+  // already proved control is asked to decide, every other one to check.
   const actions = isVerified ? null : (
     <>
       {newCode}
       {needsNewCode ? null : isHeld ? (
-        <Button size="sm" onClick={() => setTakeoverOpen(true)}>
-          Take over
-        </Button>
+        <Button onClick={() => setTakeoverOpen(true)}>Take over</Button>
       ) : (
         verifyButton
       )}
@@ -204,7 +249,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           href="/domains"
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
-            "-ml-2 h-8",
+            "text-muted-foreground hover:text-foreground -ml-2 h-8",
           )}
         >
           <ArrowLeft className="size-3.5" />
@@ -214,40 +259,35 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-x-8 gap-y-5">
-          <div className="flex flex-col items-start gap-2">
-            <StatusBadge state={claim.state} />
-            <span className="flex items-center gap-1">
-              <span className="font-mono">{claim.domain}</span>
-              <CopyButton
-                value={claim.domain}
-                label="domain"
-                className="size-6 shrink-0"
-              />
-              {claim.verifiedAt !== null ? null : (
-                <EditDomainDialog claimId={claim.id} domain={claim.domain} />
-              )}
-            </span>
+        <CardContent className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+            <div className="min-w-0 space-y-2">
+              <StatusBadge state={claim.state} />
+              <h1 className="flex min-w-0 items-center gap-1 font-mono text-lg font-semibold tracking-tight">
+                <span className="truncate">{claim.domain}</span>
+                <CopyButton
+                  value={claim.domain}
+                  label="domain"
+                  className="size-6 shrink-0"
+                />
+                {claim.verifiedAt !== null ? null : (
+                  <EditDomainDialog claimId={claim.id} domain={claim.domain} />
+                )}
+              </h1>
+            </div>
+
+            {actions ? (
+              <div className="flex flex-wrap items-center gap-2">{actions}</div>
+            ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-x-8 gap-y-4">
+          <dl className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
             <Meta label="Added" iso={claim.createdAt} />
             {lastChecked ? (
               <Meta label="Last checked" iso={lastChecked} />
             ) : null}
-            {isVerified ? null : (
-              <Meta
-                label={
-                  claim.state === "superseded"
-                    ? "Code invalidated"
-                    : needsNewCode
-                      ? "Code expired"
-                      : "Code expires"
-                }
-                iso={claim.tokenExpiresAt}
-              />
-            )}
-          </div>
+            <CodeExpiry claim={claim} />
+          </dl>
         </CardContent>
       </Card>
 
@@ -256,14 +296,13 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
       {/* Verification is point-in-time, so a verified claim has no record to
           show: the proof is done and the TXT value has no ongoing job. */}
       {isVerified ? null : showComparison ? (
-        <ExpectedVsFoundCard claim={claim} footer={actions} />
+        <ExpectedVsFoundCard claim={claim} />
       ) : (
         <DnsRecordCard
           value={claim.recordValue}
           hostname={claim.verificationHostname}
           title={needsNewCode ? "Previous record" : "Add this DNS record"}
           inactive={needsNewCode}
-          footer={actions}
         />
       )}
 

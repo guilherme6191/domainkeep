@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 
-// A check inside a rounded square: what the product does, in one glyph.
+// A check inside a rounded square: what the product does, in one glyph. The
+// favicon at src/app/icon.svg is the same drawing; change both together.
 function Mark() {
   return (
     <svg viewBox="0 0 20 20" className="size-5 shrink-0" aria-hidden>

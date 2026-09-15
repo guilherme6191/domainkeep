@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#000"/>
-  <text x="32" y="44" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="600" font-size="34" letter-spacing="-1" fill="#fff">Dk</text>
+  <!-- The same mark as the header wordmark (src/components/app-header.tsx),
+       with the accent baked in: oklch(0.56 0.17 268) is #4a6bd7. -->
+  <rect width="64" height="64" rx="19" fill="#4a6bd7"/>
+  <path d="M17.8 33.4l9.2 9.2L46.2 23.5" fill="none" stroke="#fff" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

@@ -26,6 +26,12 @@ The first miss is usually propagation, so the copy says "yet", the code stays va
 
 ![Record not found, with the troubleshooting checklist open](images/record-not-found.jpg)
 
+## Value mismatch
+
+The record exists but no value matches. The expected value sits beside what DNS actually returned, so the fix is a comparison rather than a guess.
+
+![Value mismatch, expected versus found](images/value-mismatch.jpg)
+
 ## DNS did not respond
 
 A lookup that timed out or was refused. Nothing needs changing; the user retries.
@@ -52,4 +58,4 @@ The confirmation says what deletion means: the domain is free for anyone who con
 
 ## Not pictured
 
-Value mismatch (expected versus found), held elsewhere with its Take over dialog, and the previous holder's superseded view with the notice email. Each needs a second account or a deliberately wrong record to reproduce.
+Held elsewhere with its Take over dialog, and the previous holder's superseded view with the notice email. Both need a second account to reproduce.

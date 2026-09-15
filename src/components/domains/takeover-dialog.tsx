@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTakeOver } from "@/hooks/use-claims";
 import { toastApiError } from "@/lib/api/toast-error";
+import type { ClaimView } from "@/lib/types";
 
 /**
  * The moment the whole flow exists for: the proof matched, the domain is
@@ -21,18 +22,21 @@ import { toastApiError } from "@/lib/api/toast-error";
  * the held panel afterwards — hence no trigger of its own.
  *
  * Cancelling sends nothing. The other account learns of this only if the user
- * confirms.
+ * confirms. `onResult` hands the settled claim back to the page, which treats
+ * it like any other check's answer.
  */
 export function TakeoverDialog({
   claimId,
   domain,
   open,
   onOpenChange,
+  onResult,
 }: {
   claimId: string;
   domain: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onResult?: (claim: ClaimView) => void;
 }) {
   const takeOver = useTakeOver(claimId);
 
@@ -61,6 +65,7 @@ export function TakeoverDialog({
             onClick={() => takeOver.mutate(undefined, {
               onSuccess: (updated) => {
                 onOpenChange(false);
+                onResult?.(updated);
                 // The transfer runs its own lookup and its own guards, so the
                 // answer may be anything from a verified claim to a fresh DNS
                 // failure. The panel behind names the outcome; the toast says

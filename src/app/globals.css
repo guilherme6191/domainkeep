@@ -135,7 +135,8 @@
   }
 
   /* Motion is decoration here, never information: every enter, exit and
-     transition collapses to an instant cut when the user has asked for less. */
+     transition collapses to an instant cut when the user has asked for less.
+     That includes the spinner, which the "Checking…" label already covers. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

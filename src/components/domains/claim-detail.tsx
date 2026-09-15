@@ -21,14 +21,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useClaim, useReplaceToken, useVerifyClaim } from "@/hooks/use-claims";
 import { ApiRequestError } from "@/lib/api/client";
 import { toastApiError } from "@/lib/api/toast-error";
-import { codeExpiryIsUrgent, lastCheckedAt } from "@/lib/claim-state";
+import { codeExpiryIsUrgent, codeIsDead, lastCheckedAt } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ClaimView, ClaimViewState } from "@/lib/types";
 
 // What a screen reader hears when a check settles. The panels announce
 // themselves when they mount, but a second miss re-renders the same panel
-// and says nothing, so the result is spoken here every time.
+// and says nothing, so the result is spoken here every time. Keyed on the
+// full state type so a new outcome can't be added without a sentence;
+// `setup_required` is never a check's answer and is here for completeness.
 const OUTCOME: Record<ClaimViewState, string> = {
   verified: "Verified. You control this domain.",
   record_not_found: "Record not found yet. DNS may still be propagating.",
@@ -40,23 +42,27 @@ const OUTCOME: Record<ClaimViewState, string> = {
   setup_required: "Not checked yet.",
 };
 
-// Relative time, with the exact instant on hover.
+// Relative time, with the exact instant on hover. `urgent` colours the whole
+// pair amber; otherwise the label is muted and the value reads in the
+// foreground.
 function Meta({
   label,
   iso,
-  className,
   icon,
+  urgent = false,
 }: {
   label: string;
   iso: string;
-  className?: string;
   icon?: React.ReactNode;
+  urgent?: boolean;
 }) {
   return (
-    <div className={cn("flex items-center gap-1.5", className)}>
-      {icon}
-      <dt>{label}</dt>
-      <dd className="text-foreground" title={formatDateTime(iso)}>
+    <div className={cn("flex items-center gap-1.5", urgent && "text-amber-300")}>
+      <dt className="flex items-center gap-1.5">
+        {icon}
+        {label}
+      </dt>
+      <dd className={cn(!urgent && "text-foreground")} title={formatDateTime(iso)}>
         {formatRelative(iso)}
       </dd>
     </div>
@@ -71,21 +77,18 @@ function Meta({
 function CodeExpiry({ claim }: { claim: ClaimView }) {
   if (claim.state === "verified") return null;
 
-  const dead = claim.state === "expired" || claim.state === "superseded";
-  const urgent = codeExpiryIsUrgent(claim);
-
   return (
     <Meta
       label={
         claim.state === "superseded"
           ? "Code invalidated"
-          : dead
+          : codeIsDead(claim)
             ? "Code expired"
             : "Code expires"
       }
       iso={claim.tokenExpiresAt}
       icon={<Clock className="size-3.5" aria-hidden />}
-      className={cn(urgent && "text-amber-300 [&_dd]:text-amber-300")}
+      urgent={codeExpiryIsUrgent(claim)}
     />
   );
 }
@@ -103,6 +106,15 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   // doing the same, and so a repeated outcome still gets a fresh panel.
   const [checks, setChecks] = useState(0);
   const [announcement, setAnnouncement] = useState("");
+  // Lives here, not in the panel, so a re-check can't snap it shut.
+  const [troubleshootingOpen, setTroubleshootingOpen] = useState(false);
+
+  // Every settled lookup, whether a check or a confirmed takeover, lands the
+  // same way: a fresh panel and a spoken outcome.
+  function settle(updated: ClaimView) {
+    setChecks((count) => count + 1);
+    setAnnouncement(OUTCOME[updated.state]);
+  }
 
   if (isPending) {
     return (
@@ -151,7 +163,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   const isVerified = claim.state === "verified";
   // Read from the server's state, never from `tokenExpiresAt`: a verified claim
   // has no challenge, so its token's age means nothing here.
-  const needsNewCode = claim.state === "expired" || claim.state === "superseded";
+  const needsNewCode = codeIsDead(claim);
   const isHeld = claim.state === "held_by_another";
   const checkedBefore = claim.lastCheck !== null;
   const verifyLabel = checkedBefore ? "Check again" : "Verify domain";
@@ -164,8 +176,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     setAnnouncement("Checking DNS…");
     verify.mutate(undefined, {
       onSuccess: (updated) => {
-        setChecks((count) => count + 1);
-        setAnnouncement(OUTCOME[updated.state]);
+        settle(updated);
         // The proof matched but the domain is someone else's. Ask now, while
         // the user is watching their own click.
         if (updated.state === "held_by_another") {
@@ -180,7 +191,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   }
 
   // Quiet in the top bar: deletion is rare, and it should never outweigh the
-  // check. It turns red only under the pointer.
+  // check. It turns red only under the pointer or keyboard focus.
   const deleteDomain = (
     <DeleteDomainDialog
       claimId={claim.id}
@@ -194,7 +205,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground hover:text-destructive -mr-2 h-8"
+          className="text-muted-foreground hover:text-destructive focus-visible:text-destructive -mr-2 h-8"
         >
           Delete domain
         </Button>
@@ -283,8 +294,12 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
             <div className="min-w-0 space-y-2">
               <StatusBadge state={claim.state} />
-              <h1 className="flex min-w-0 items-center gap-1 font-mono text-lg font-semibold tracking-tight">
-                <span className="truncate">{claim.domain}</span>
+              {/* The controls sit beside the heading, not inside it, so its
+                  accessible name is the domain alone. */}
+              <div className="flex min-w-0 items-center gap-1">
+                <h1 className="truncate font-mono text-lg font-semibold tracking-tight">
+                  {claim.domain}
+                </h1>
                 <CopyButton
                   value={claim.domain}
                   label="domain"
@@ -293,7 +308,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
                 {claim.verifiedAt !== null ? null : (
                   <EditDomainDialog claimId={claim.id} domain={claim.domain} />
                 )}
-              </h1>
+              </div>
             </div>
 
             {actions ? (
@@ -328,7 +343,10 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           verify.isPending && "opacity-60",
         )}
       >
-        <ClaimStatePanel claim={claim} />
+        <ClaimStatePanel
+          claim={claim}
+          fold={{ open: troubleshootingOpen, onOpenChange: setTroubleshootingOpen }}
+        />
 
         {/* Verification is point-in-time, so a verified claim has no record to
             show: the proof is done and the TXT value has no ongoing job. */}
@@ -349,6 +367,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         domain={claim.domain}
         open={takeoverOpen}
         onOpenChange={setTakeoverOpen}
+        onResult={settle}
       />
     </div>
   );

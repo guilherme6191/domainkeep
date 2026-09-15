@@ -61,6 +61,11 @@ export function lastCheckedAt(
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** The code can no longer verify anything; only a replacement can. */
+export function codeIsDead(claim: Pick<ClaimView, "state">): boolean {
+  return claim.state === "expired" || claim.state === "superseded";
+}
+
 /**
  * Whether the code deserves the user's attention now: already dead, or
  * inside its last day, when a record published today may stop counting
@@ -70,6 +75,6 @@ export function codeExpiryIsUrgent(
   claim: Pick<ClaimView, "state" | "tokenExpiresAt">,
   now: Date = new Date(),
 ): boolean {
-  if (claim.state === "expired" || claim.state === "superseded") return true;
+  if (codeIsDead(claim)) return true;
   return new Date(claim.tokenExpiresAt).getTime() - now.getTime() < DAY_MS;
 }

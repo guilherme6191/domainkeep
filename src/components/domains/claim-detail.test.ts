@@ -83,6 +83,13 @@ describe("claim detail verified view", () => {
   });
 });
 
+describe("claim detail announcements", () => {
+  it("renders a polite live region for check outcomes", () => {
+    useClaimMock.mockReturnValue({ data: claimView() });
+    expect(render()).toMatch(/<p[^>]*role="status"[^>]*aria-live="polite"/);
+  });
+});
+
 describe("claim detail held by another account", () => {
   // The proof already matched, so there is nothing left to check: the claim is
   // asked to decide instead. Nothing has moved and nobody has been told yet.

@@ -1,13 +1,7 @@
 import { Info } from "lucide-react";
 import { CopyButton } from "@/components/domains/copy-button";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { recordName } from "@/lib/domain";
 import { VERIFICATION_VALUE_PREFIX } from "@/lib/types";
@@ -88,20 +82,18 @@ function NameHelp({ hostname }: { hostname: string }) {
 
 /**
  * `inactive` is the expired case: shown for reference, dimmed, not copyable.
- * The footer stays live because that is where the way out lives.
+ * The way out, a new code, lives in the header card above.
  */
 export function DnsRecordCard({
   value,
   hostname,
   title = "Add this DNS record",
   inactive = false,
-  footer,
 }: {
   value: string;
   hostname: string;
   title?: string;
   inactive?: boolean;
-  footer?: React.ReactNode;
 }) {
   const name = recordName(hostname);
 
@@ -178,12 +170,6 @@ export function DnsRecordCard({
           </p>
         </div>
       </CardContent>
-
-      {footer ? (
-        <CardFooter className="flex-wrap justify-end gap-2">
-          {footer}
-        </CardFooter>
-      ) : null}
     </Card>
   );
 }

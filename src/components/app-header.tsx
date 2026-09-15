@@ -9,7 +9,7 @@ function Mark() {
       <path
         d="M6 10.4l2.6 2.6L14 7.6"
         fill="none"
-        stroke="white"
+        className="stroke-primary-foreground"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"

@@ -17,7 +17,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -34,9 +33,22 @@ function Mono({ children }: { children: React.ReactNode }) {
 // Each outcome has its own glyph, so the shape says what happened before the
 // words do: nothing found, a mismatch, no answer, someone else, out of time.
 
+/** The fold on the not-found checklist, owned by the page so a re-check that
+ *  remounts the panel doesn't snap it shut mid-troubleshooting. */
+export interface TroubleshootingFold {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
 // The first miss is usually propagation, so the checklist stays folded until
 // the user wants it.
-function RecordNotFound({ claim }: { claim: ClaimView }) {
+function RecordNotFound({
+  claim,
+  fold,
+}: {
+  claim: ClaimView;
+  fold?: TroubleshootingFold;
+}) {
   return (
     <Alert>
       <SearchX />
@@ -47,7 +59,11 @@ function RecordNotFound({ claim }: { claim: ClaimView }) {
           shortly — your code stays valid between checks.
         </p>
 
-        <details className="group">
+        <details
+          className="group"
+          open={fold?.open}
+          onToggle={(event) => fold?.onOpenChange(event.currentTarget.open)}
+        >
           <summary className="text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm font-medium outline-none focus-visible:ring-3 [&::-webkit-details-marker]:hidden">
             <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
             Still missing after a while?
@@ -89,13 +105,7 @@ function ValueMismatch() {
 
 // Replaces the record card in the mismatch state so expected and found read
 // side by side.
-export function ExpectedVsFoundCard({
-  claim,
-  footer,
-}: {
-  claim: ClaimView;
-  footer?: React.ReactNode;
-}) {
+export function ExpectedVsFoundCard({ claim }: { claim: ClaimView }) {
   const observed =
     claim.lastCheck?.result === "value_mismatch"
       ? claim.lastCheck.observedValues
@@ -163,10 +173,6 @@ export function ExpectedVsFoundCard({
           TXT value, then check again.
         </p>
       </CardContent>
-
-      {footer ? (
-        <CardFooter className="flex-wrap justify-end gap-2">{footer}</CardFooter>
-      ) : null}
     </Card>
   );
 }
@@ -174,7 +180,7 @@ export function ExpectedVsFoundCard({
 /**
  * Carries the same neutral colour as the diagnostic panels, because it is the
  * outcome of a check like any of them — but what it asks for is a decision
- * rather than a fix. The Take over button lives in the card footer below,
+ * rather than a fix. The Take over button lives in the header card above,
  * beside Generate a new code.
  */
 function HeldByAnother({ claim }: { claim: ClaimView }) {
@@ -235,10 +241,12 @@ function RecentTakeoverNotice({ tookOverAt }: { tookOverAt: string }) {
   );
 }
 
+// The one outcome worth a beat: the check mark lands a moment after the
+// panel, so success reads as an event rather than another state.
 function Verified({ claim }: { claim: ClaimView }) {
   return (
     <Alert className="border-emerald-400/35 text-emerald-300">
-      <CircleCheck />
+      <CircleCheck className="motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:fill-mode-backwards motion-safe:delay-150 motion-safe:duration-300" />
       <AlertTitle>You control {claim.domain}.</AlertTitle>
       <AlertDescription className="space-y-2">
         <p>
@@ -289,21 +297,27 @@ function SupersededNote({ claim }: { claim: ClaimView }) {
 // Colour where something is settled or definitely wrong: green verified, red
 // superseded, amber mismatch. Not found, DNS errors and expiry stay neutral,
 // because the cause may be time rather than the user.
-export function ClaimStatePanel({ claim }: { claim: ClaimView }) {
+export function ClaimStatePanel({
+  claim,
+  fold,
+}: {
+  claim: ClaimView;
+  fold?: TroubleshootingFold;
+}) {
   if (claim.state === "superseded") return <Superseded claim={claim} />;
 
   return (
     <>
       <SupersededNote claim={claim} />
-      {statePanel(claim)}
+      {statePanel(claim, fold)}
     </>
   );
 }
 
-function statePanel(claim: ClaimView) {
+function statePanel(claim: ClaimView, fold?: TroubleshootingFold) {
   switch (claim.state) {
     case "record_not_found":
-      return <RecordNotFound claim={claim} />;
+      return <RecordNotFound claim={claim} fold={fold} />;
     case "value_mismatch":
       return <ValueMismatch />;
     case "temporary_dns_error":

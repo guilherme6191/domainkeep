@@ -50,9 +50,12 @@ describe("normalizeDomain", () => {
     expect(verificationHostname("news.recomendei.me")).toBe(
       "news.recomendei.me",
     );
+    // The literal is the wire value users publish, so pin it rather than
+    // rebuilding it from the constant the function itself uses.
     expect(verificationRecordValue("a".repeat(64))).toBe(
-      `${VERIFICATION_VALUE_PREFIX}${"a".repeat(64)}`,
+      `domainkeep-verify=${"a".repeat(64)}`,
     );
+    expect(VERIFICATION_VALUE_PREFIX).toBe("domainkeep-verify=");
   });
 
   it.each([

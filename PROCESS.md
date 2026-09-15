@@ -16,23 +16,21 @@ What is proven also needs care. A DNS check establishes control of the zone at t
 
 The work was timeboxed to a week. The brief identified the hard part as the failure and recovery path, not the CRUD around it: each check has to produce a distinct, actionable outcome, and propagation must never look like user error. That shaped what was cut.
 
-The brief's [scope section](docs/domain-verification-product-brief.md#scope) records the decisions. In short:
+The brief's [scope section](docs/domain-verification-product-brief.md#scope) records the decisions as a core release, a recovery-and-polish tier, and an out-of-scope list. In short:
 
-- **In:** claim an exact name, receive one copyable TXT instruction, check on demand, get a diagnosis with a next action, replace an expired or compromised code deliberately, and let a newer proof take a domain over from another account after the prover confirms.
-- **Deferred:** background verification and automatic rechecks, transfer cooldowns and dispute handling, rate limiting, attempt history, and durable notification retries. Each is real production work; none of it changes whether a user can understand and recover from a failed check.
-- **Out:** editing DNS, provider integrations, SPF and DKIM setup, legal ownership, and organization administration.
+- **In:** claim an exact name, receive one copyable TXT instruction, check on demand, get a diagnosis with a next action, replace an expired or compromised code deliberately, let a newer proof take a domain over from another account after the prover confirms, correct a never-verified domain, and email the previous holder after a takeover.
+- **Out:** editing DNS, provider integrations, SPF and DKIM setup, legal ownership, and organization administration. Alongside those sit the pieces of production work that were deferred on purpose: background verification and automatic rechecks, transfer cooldowns and dispute handling, rate limiting, attempt history, and durable notification retries. None of them changes whether a user can understand and recover from a failed check, and the README's tradeoffs take each one up in turn.
 
 Authentication stayed in scope even though a session-only prototype would have been faster. A claim is an account/domain association, and competing claims only mean something when accounts are durable. See the [README's tradeoffs](README.md#tradeoffs-and-limitations) for the reasoning.
 
 ## Technical design
 
-The [technical specification](docs/domain-verification-technical-spec.md) owns the mechanisms. The parts worth reading first:
+The [technical specification](docs/domain-verification-technical-spec.md) owns the mechanisms, and the README's [Architecture](README.md#architecture) section summarizes them. Rather than restate either, here is where each design question is answered:
 
-- **The state model.** There is no stored status column. The claim view has eight states, derived on the server in strict priority order from durable fields: superseded, verified, expired, setup required, then whichever result the last check recorded. The [state ladder](docs/domain-verification-technical-spec.md#state-behavior) explains why superseded outranks expired and why `held_by_another` needs no rung of its own. The list collapses those states into five badges by next action, so a possibly-propagating record reads as "Needs attention" rather than "Failed".
-- **The exclusivity rule lives in Postgres.** A partial unique index allows one currently verified holder per domain, and a single database function performs the transfer: it locks the winning claim, confirms the token is still current, supersedes the previous holder and expires their token, and marks the winner verified, all in one transaction. The [reassignment section](docs/domain-verification-technical-spec.md#reassignment-and-atomicity) walks through the races it closes.
-- **Verification is user-triggered, never polled.** Adding a domain issues instructions and runs no lookup. Every check starts with a click, and each request performs at most one DNS lookup. There is no background job, so a transfer can never happen while nobody is watching, and retries reuse the same code until its seven-day expiry or a deliberate replacement.
-- **Verifying and taking over are separate requests.** A matching proof on a held domain records `held_by_another` and stops. The transfer runs only on an explicit take-over request, which resolves DNS again rather than trusting the earlier match, so control is proved in the request that acts on it. Neither account ever learns the other's identity.
-- **DNS observations are untrusted input.** Only values carrying the product's prefix are considered, mismatches keep at most five bounded values, and everything renders as text.
+- **The state model.** There is no stored status column; the view state is derived on the server from durable fields in a strict priority order. The [state ladder](docs/domain-verification-technical-spec.md#state-behavior) explains why superseded outranks expired and why `held_by_another` needs no rung of its own.
+- **The exclusivity rule.** It lives in Postgres, as a partial unique index and one transfer function. The [reassignment section](docs/domain-verification-technical-spec.md#reassignment-and-atomicity) walks through the races that transaction closes.
+- **Where verification runs.** Only in a request the user started, with at most one lookup each; nothing polls. The [DNS routes section](docs/domain-verification-technical-spec.md#the-dns-routes-return-200-for-every-classified-outcome) covers why verifying and taking over are separate requests and why the second one resolves DNS again.
+- **What DNS is trusted to say.** Nothing, until it is classified. [DNS lookup and matching](docs/domain-verification-technical-spec.md#dns-lookup-and-matching) bounds what is kept and shown.
 
 ## Decisions and tradeoffs
 
@@ -42,7 +40,7 @@ The README's [Tradeoffs and limitations](README.md#tradeoffs-and-limitations) se
 
 The brief and spec came first and were revised before any application code, settling the root TXT record, click-only checks, the list labels, and the takeover email. The application landed on the third day, and most of the remaining time went to what running it against live DNS taught.
 
-- **The record Name field.** Every claim first showed `@` in the Name column. For a subdomain, someone editing the parent zone pastes that, publishes at the apex, and gets record-not-found. Providers take the label relative to the zone and append the rest themselves, so the card now shows that relative label, with the full hostname spelled out underneath as the invariant to check against.
+- **The record Name field.** Every claim first showed `@` in the Name column. For a subdomain, someone editing the parent zone pastes that, publishes at the apex, and gets record-not-found. Most providers take the label relative to the registrable domain and append the rest themselves, so the card now shows that label, with the full hostname spelled out underneath as the invariant to check against for the delegated zones where it is not.
 - **Copying the value.** The table shows a short form of the token, and the clipboard sometimes refuses. The copy button carries the full value, a refused copy raises a toast, and a popover exposes the whole value for manual selection.
 - **Verified claims dropped the record card.** Once the proof is complete the TXT value has no ongoing job, so the verified panel tells the user they may remove it instead of showing it. Decisions moved from token age to the derived state, so the client never reads the expiry to decide anything.
 - **Takeover became a question.** The latest design change was to stop a matching proof from moving a held domain by itself. Verifying now reports that the domain is held elsewhere, and the transfer waits for an explicit confirmation and a fresh lookup. The brief, spec, and README were updated to match.

@@ -1,0 +1,11 @@
+- main [ref=e2]:
+  - generic [ref=e6]:
+    - generic [ref=e7]: TXT
+    - generic [ref=e11]:
+      - generic [ref=e12]: "@"
+      - button [ref=e13] [cursor=pointer]
+      - button [ref=e14] [cursor=pointer]
+    - generic [ref=e17]:
+      - generic [ref=e18]: domainkeep-verify=aaaaaaaaaa[…]aaaaaaaaaa
+      - button [ref=e19] [cursor=pointer]
+    - generic [ref=e20]: Auto

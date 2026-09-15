@@ -6,8 +6,6 @@ A verified claim can be superseded by another account's fresh DNS proof, once th
 
 **Live app:** [https://domainkeep.vercel.app](https://domainkeep.vercel.app) — sign up with any email, add a domain whose DNS you can edit, and follow the on-screen instructions.
 
-**How it was built:** [PROCESS.md](PROCESS.md) walks through the problem, the scoping, and the design decisions.
-
 ## How failure and recovery work
 
 The goal is a workflow a user can understand, watch fail, and fix. Three choices carry that:
@@ -100,3 +98,7 @@ pnpm lint
 | --- | --- |
 | [Local development](LOCAL-DEVELOPMENT.md) | Running the app locally, with the Clerk and Supabase setup and the environment reference. |
 | [docs/](docs/) | Product brief and technical specification: principles, scope, API contracts, state modeling, persistence, and security. |
+
+## How this was built
+
+AI throughout, in passes. Understand the problem, explore ideas and constraints, make the calls and weigh their tradeoffs — that became the [product brief](docs/domain-verification-product-brief.md). The [technical spec](docs/domain-verification-technical-spec.md) came out of the brief; both were iterated before any code. A first visual version with Claude Design, iterated. Then implement, review, and iterate over all of it again.

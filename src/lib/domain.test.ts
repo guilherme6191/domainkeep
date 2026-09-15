@@ -5,6 +5,7 @@ import {
   verificationHostname,
   verificationRecordValue,
 } from "@/lib/domain";
+import { VERIFICATION_VALUE_PREFIX } from "@/lib/types";
 
 function normalized(input: string): string | null {
   const result = normalizeDomain(input);
@@ -50,7 +51,7 @@ describe("normalizeDomain", () => {
       "news.recomendei.me",
     );
     expect(verificationRecordValue("a".repeat(64))).toBe(
-      `resend-verify=${"a".repeat(64)}`,
+      `${VERIFICATION_VALUE_PREFIX}${"a".repeat(64)}`,
     );
   });
 

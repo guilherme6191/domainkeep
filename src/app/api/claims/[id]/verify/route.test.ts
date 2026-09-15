@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClaimRecord } from "@/lib/db/claims";
 import { setResolver } from "@/lib/dns";
 import type { TxtLookup } from "@/lib/dns/resolver";
-import type { ClaimView, LastCheckResult } from "@/lib/types";
+import { VERIFICATION_VALUE_PREFIX, type ClaimView, type LastCheckResult } from "@/lib/types";
 import {
   CLAIM_ID,
   NOW,
@@ -109,7 +109,7 @@ describe("POST /api/claims/:id/verify", () => {
 
   it("verifies on a matching record, exposing the takeover time but never the owner", async () => {
     getClaim.mockResolvedValue(record());
-    fakeDns({ outcome: "records", records: [[`resend-verify=${TOKEN}`]] });
+    fakeDns({ outcome: "records", records: [[`${VERIFICATION_VALUE_PREFIX}${TOKEN}`]] });
     verifyClaimAtomically.mockResolvedValue(
       record({ verifiedAt: NOW, tookOverAt: NOW }),
     );
@@ -120,7 +120,7 @@ describe("POST /api/claims/:id/verify", () => {
     expect(response.status).toBe(200);
     expect(body.state).toBe("verified");
     expect(body.tookOverAt).toBe(NOW.toISOString());
-    expect(body.recordValue).toBe(`resend-verify=${TOKEN}`);
+    expect(body.recordValue).toBe(`${VERIFICATION_VALUE_PREFIX}${TOKEN}`);
     expect(body).not.toHaveProperty("ownerId");
     expect(verifyClaimAtomically).toHaveBeenCalledOnce();
     expect(notifyTakeover).toHaveBeenCalledWith(
@@ -131,7 +131,7 @@ describe("POST /api/claims/:id/verify", () => {
 
   it("tells nobody when the verification displaced nobody", async () => {
     getClaim.mockResolvedValue(record());
-    fakeDns({ outcome: "records", records: [[`resend-verify=${TOKEN}`]] });
+    fakeDns({ outcome: "records", records: [[`${VERIFICATION_VALUE_PREFIX}${TOKEN}`]] });
     verifyClaimAtomically.mockResolvedValue(record({ verifiedAt: NOW }));
 
     const body: ClaimView = await (await call()).json();
@@ -142,7 +142,7 @@ describe("POST /api/claims/:id/verify", () => {
 
   it("still verifies when the takeover notice fails to send", async () => {
     getClaim.mockResolvedValue(record());
-    fakeDns({ outcome: "records", records: [[`resend-verify=${TOKEN}`]] });
+    fakeDns({ outcome: "records", records: [[`${VERIFICATION_VALUE_PREFIX}${TOKEN}`]] });
     verifyClaimAtomically.mockResolvedValue(
       record({ verifiedAt: NOW, tookOverAt: NOW }),
     );
@@ -162,7 +162,7 @@ describe("POST /api/claims/:id/verify", () => {
     [
       {
         outcome: "records",
-        records: [["resend-verify=something-else"]],
+        records: [[`${VERIFICATION_VALUE_PREFIX}something-else`]],
       } as TxtLookup,
       "value_mismatch",
     ],
@@ -180,7 +180,7 @@ describe("POST /api/claims/:id/verify", () => {
     if (expected === "value_mismatch") {
       expect(body.lastCheck).toMatchObject({
         result: "value_mismatch",
-        observedValues: ["resend-verify=something-else"],
+        observedValues: [`${VERIFICATION_VALUE_PREFIX}something-else`],
       });
     }
     expect(verifyClaimAtomically).not.toHaveBeenCalled();
@@ -250,7 +250,7 @@ describe("POST /api/claims/:id/verify", () => {
 describe("takeover consent", () => {
   beforeEach(() => {
     getClaim.mockResolvedValue(record());
-    fakeDns({ outcome: "records", records: [[`resend-verify=${TOKEN}`]] });
+    fakeDns({ outcome: "records", records: [[`${VERIFICATION_VALUE_PREFIX}${TOKEN}`]] });
     verifyClaimAtomically.mockResolvedValue(record({ verifiedAt: NOW }));
   });
 

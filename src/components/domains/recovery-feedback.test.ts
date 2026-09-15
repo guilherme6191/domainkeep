@@ -2,6 +2,7 @@ import { createElement, type PropsWithChildren } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@/lib/api/client";
+import { VERIFICATION_VALUE_PREFIX } from "@/lib/types";
 
 const { toastError, deleteMutation } = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock("@/components/ui/alert-dialog", () => {
 const { CopyButton } = await import("@/components/domains/copy-button");
 const { DnsRecordCard } = await import("@/components/domains/dns-record-card");
 const { DeleteDomainDialog } = await import("@/components/domains/delete-domain-dialog");
-const VALUE = `resend-verify=${"a".repeat(64)}`;
+const VALUE = `${VERIFICATION_VALUE_PREFIX}${"a".repeat(64)}`;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,7 +62,7 @@ describe("copy recovery", () => {
       value: VALUE,
       hostname: "example.com",
     }));
-    expect(html).toContain(`>resend-verify=${"a".repeat(10)}<span`);
+    expect(html).toContain(`>${VERIFICATION_VALUE_PREFIX}${"a".repeat(10)}<span`);
     expect(html).toContain(`>[…]</span>${"a".repeat(10)}</span>`);
     expect(html).toContain(`title="${VALUE}"`);
   });

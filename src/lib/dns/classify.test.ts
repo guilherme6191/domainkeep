@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { classifyTxtLookup, MAX_OBSERVED_VALUES } from "@/lib/dns/classify";
+import { VERIFICATION_VALUE_PREFIX } from "@/lib/types";
 
 const TOKEN = "a".repeat(64);
-const VALUE = `resend-verify=${TOKEN}`;
+const VALUE = `${VERIFICATION_VALUE_PREFIX}${TOKEN}`;
 
 describe("classifyTxtLookup", () => {
   it("verifies when any record matches exactly", () => {
@@ -26,7 +27,7 @@ describe("classifyTxtLookup", () => {
     const outcome = classifyTxtLookup(
       {
         outcome: "records",
-        records: [[VALUE.slice(0, 40)], [`resend-verify=${TOKEN.slice(40)}`]],
+        records: [[VALUE.slice(0, 40)], [`${VERIFICATION_VALUE_PREFIX}${TOKEN.slice(40)}`]],
       },
       TOKEN,
     );
@@ -36,12 +37,12 @@ describe("classifyTxtLookup", () => {
   it("reports a mismatch with the values it actually saw", () => {
     expect(
       classifyTxtLookup(
-        { outcome: "records", records: [["resend-verify=not-the-token"]] },
+        { outcome: "records", records: [[`${VERIFICATION_VALUE_PREFIX}not-the-token`]] },
         TOKEN,
       ),
     ).toEqual({
       result: "value_mismatch",
-      observedValues: ["resend-verify=not-the-token"],
+      observedValues: [`${VERIFICATION_VALUE_PREFIX}not-the-token`],
     });
   });
 
@@ -64,17 +65,17 @@ describe("classifyTxtLookup", () => {
           records: [
             ["v=spf1 -all"],
             ["google-site-verification=abc"],
-            ["resend-verify=stale"],
+            [`${VERIFICATION_VALUE_PREFIX}stale`],
           ],
         },
         TOKEN,
       ),
-    ).toEqual({ result: "value_mismatch", observedValues: ["resend-verify=stale"] });
+    ).toEqual({ result: "value_mismatch", observedValues: [`${VERIFICATION_VALUE_PREFIX}stale`] });
   });
 
   it("bounds how many observed values it will keep", () => {
     const records = Array.from({ length: 20 }, (_, index) => [
-      `resend-verify=value-${index}`,
+      `${VERIFICATION_VALUE_PREFIX}value-${index}`,
     ]);
     const outcome = classifyTxtLookup({ outcome: "records", records }, TOKEN);
     expect(

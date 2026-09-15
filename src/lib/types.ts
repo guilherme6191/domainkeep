@@ -1,5 +1,5 @@
 /** Self-identifying prefix on the published value; only prefixed values count. */
-export const VERIFICATION_VALUE_PREFIX = "resend-verify=";
+export const VERIFICATION_VALUE_PREFIX = "domainkeep-verify=";
 
 export type LastCheckResult =
   | "record_not_found"

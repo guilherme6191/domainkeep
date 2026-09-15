@@ -1,6 +1,6 @@
 # Domain Ownership Verification
 
-Domainkeep is a domain claiming product. A user enters a domain they control, publishes one TXT record at that name with the value `resend-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, held by another account, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
+Domainkeep is a domain claiming product. A user enters a domain they control, publishes one TXT record at that name with the value `domainkeep-verify=<token>` (the UI calls it a code), and asks for a check. The backend performs at most one DNS lookup per request and answers with a specific, actionable result — verified, held by another account, record not found, value mismatch, or a temporary DNS failure — rather than a generic pass/fail.
 
 A verified claim can be superseded by another account's fresh DNS proof, once that account confirms the takeover.
 
@@ -38,8 +38,8 @@ The claim view has eight states, derived from durable fields in the order shown:
 | `verified` | `verifiedAt` is set and `supersededAt` is null | This account currently holds the association. Nothing else is required. |
 | `expired` | `tokenExpiresAt <= now` | The pending challenge is no longer valid. Generate a new code. |
 | `setup_required` | `lastCheck` is null | Not checked yet, never *failed*. Adding a domain runs no lookup. |
-| `record_not_found` | `lastCheck.result` is `record_not_found` | No `resend-verify=` value answered at the name. Check the name and the prefix, wait, and retry. |
-| `value_mismatch` | `lastCheck.result` is `value_mismatch` | A `resend-verify=` value exists but none matches. Compare, correct, and retry. |
+| `record_not_found` | `lastCheck.result` is `record_not_found` | No `domainkeep-verify=` value answered at the name. Check the name and the prefix, wait, and retry. |
+| `value_mismatch` | `lastCheck.result` is `value_mismatch` | A `domainkeep-verify=` value exists but none matches. Compare, correct, and retry. |
 | `temporary_dns_error` | `lastCheck.result` is `temporary_dns_error` | DNS did not respond reliably. Retry without changing the record. |
 | `held_by_another` | `lastCheck.result` is `held_by_another` | The record matched, but another account holds the domain. Nothing has moved; take it over or leave it. |
 

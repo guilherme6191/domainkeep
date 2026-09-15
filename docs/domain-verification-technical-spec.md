@@ -44,7 +44,7 @@ interface ClaimView {
   domain: string;                  // normalized, ASCII
   verificationHostname: string;    // the claimed domain itself, precomputed
   token: string;
-  recordValue: string;             // resend-verify=<token>, composed server-side
+  recordValue: string;             // domainkeep-verify=<token>, composed server-side
   tokenExpiresAt: string;          // ISO 8601
   verifiedAt: string | null;
   supersededAt: string | null;
@@ -139,7 +139,7 @@ For `example.com`, the product instructs the user to publish:
 Type:  TXT
 Name:  @
 FQDN:  example.com
-Value: resend-verify=<64-character lowercase hexadecimal token>
+Value: domainkeep-verify=<64-character lowercase hexadecimal token>
 TTL:   Auto or provider default
 ```
 
@@ -248,8 +248,8 @@ A TXT lookup can return multiple records, and a single record can be divided int
 ```ts
 const observedValues = records
   .map((chunks) => chunks.join(""))
-  .filter((value) => value.startsWith("resend-verify="));
-const matched = observedValues.includes(`resend-verify=${expectedToken}`);
+  .filter((value) => value.startsWith("domainkeep-verify="));
+const matched = observedValues.includes(`domainkeep-verify=${expectedToken}`);
 ```
 
 Any exact match succeeds, even alongside old tokens. Only prefixed values contribute to diagnostics; unrelated SPF or verifier records are neither returned nor stored. Mismatches retain at most five values, truncated to 255 characters each. Matching happens before truncation. Observations render as text, not HTML.
@@ -365,8 +365,8 @@ Every outcome maps to one user decision. Messages are product surface, not debug
 | Outcome | Condition | User guidance and recovery |
 | --- | --- | --- |
 | Invalid input | The submitted value is not eligible | Explain the specific problem; issue no challenge |
-| `record_not_found` | No `resend-verify=` value is visible at the name, whatever else is | Check the value carries the prefix, check the record's full name is the claimed name rather than the zone root or a sibling, check the name is not a CNAME, wait, and retry with the same token; never assert misconfiguration |
-| `value_mismatch` | `resend-verify=` values exist but none exactly matches | Show bounded expected and observed values, prefixed values only, correct DNS, and retry with the same token |
+| `record_not_found` | No `domainkeep-verify=` value is visible at the name, whatever else is | Check the value carries the prefix, check the record's full name is the claimed name rather than the zone root or a sibling, check the name is not a CNAME, wait, and retry with the same token; never assert misconfiguration |
+| `value_mismatch` | `domainkeep-verify=` values exist but none exactly matches | Show bounded expected and observed values, prefixed values only, correct DNS, and retry with the same token |
 | `temporary_dns_error` | The resolver times out, refuses, or temporarily fails | Say the record may be correct and retry without changing DNS |
 | `expired` | Seven days elapsed on a pending challenge | Deliberately generate a replacement and explain that the old value is invalid |
 | Existing association | Another account currently holds the domain | Disclose nothing before proof; proceed like an unheld claim. After a matching proof, disclose it as `held_by_another` and transfer only on an explicit confirmation |

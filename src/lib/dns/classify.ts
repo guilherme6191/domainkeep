@@ -14,7 +14,7 @@ export const MAX_OBSERVED_VALUE_LENGTH = 255;
 
 /**
  * Pure. Chunked TXT records are reassembled before comparison. Only values
- * carrying the `resend-verify=` prefix are considered, so SPF and other
+ * carrying the `domainkeep-verify=` prefix are considered, so SPF and other
  * verifiers at the same name are neither matched against nor reported back;
  * a name with none of them reads as a missing record, not a mismatch.
  */

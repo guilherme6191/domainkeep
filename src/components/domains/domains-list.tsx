@@ -114,8 +114,13 @@ export function DomainsList({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Domains</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Domains</h1>
+          <p className="text-muted-foreground text-sm">
+            Each one is proven by a single TXT record, checked when you ask.
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <AddDomainDialog />
           <DomainsActionsMenu

@@ -29,6 +29,10 @@ import { formatDateTime, formatRelative } from "@/lib/format";
 import { type PageSize } from "@/lib/pagination";
 import type { ClaimPage, ClaimView } from "@/lib/types";
 
+// Column headings sit a step below the data in size and colour, so the eye
+// lands on the rows, not the labels.
+const HEAD = "text-muted-foreground text-xs font-medium";
+
 function LastCheckedCell({ iso }: { iso: string | null }) {
   if (!iso) {
     return (
@@ -133,10 +137,10 @@ export function DomainsTable({
                 aria-label="Select all on this page"
               />
             </TableHead>
-            <TableHead>Domain</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Last checked</TableHead>
-            <TableHead>Added</TableHead>
+            <TableHead className={HEAD}>Domain</TableHead>
+            <TableHead className={HEAD}>Status</TableHead>
+            <TableHead className={HEAD}>Last checked</TableHead>
+            <TableHead className={HEAD}>Added</TableHead>
             <TableHead className="w-12 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -155,7 +159,7 @@ export function DomainsTable({
                   aria-label={`Select ${claim.domain}`}
                 />
               </TableCell>
-              <TableCell className="font-mono">
+              <TableCell className="font-mono text-[13px]">
                 <Link
                   href={`/domains/${claim.id}`}
                   className="focus-visible:ring-ring/50 rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3"

@@ -6,6 +6,8 @@ A verified claim can be superseded by another account's fresh DNS proof, once th
 
 **Live app:** [https://domainkeep.vercel.app](https://domainkeep.vercel.app) — sign up with any email, add a domain whose DNS you can edit, and follow the on-screen instructions.
 
+**Screenshots:** [docs/screenshots.md](docs/screenshots.md) shows every screen and state, for anyone who would rather look than sign up.
+
 ## How failure and recovery work
 
 The goal is a workflow a user can understand, watch fail, and fix. Three choices carry that:

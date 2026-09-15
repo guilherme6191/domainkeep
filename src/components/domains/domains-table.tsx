@@ -1,12 +1,21 @@
 "use client";
 
+import { useState } from "react";
+import { MoreHorizontalIcon } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DeleteDomainDialog } from "@/components/domains/delete-domain-dialog";
 import { StatusBadge } from "@/components/domains/status-badge";
 import { TablePagination } from "@/components/domains/table-pagination";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -18,21 +27,70 @@ import {
 import { lastCheckedAt } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { type PageSize } from "@/lib/pagination";
-import { cn } from "@/lib/utils";
-import type { ClaimPage } from "@/lib/types";
+import type { ClaimPage, ClaimView } from "@/lib/types";
 
 function LastCheckedCell({ iso }: { iso: string | null }) {
   if (!iso) {
     return (
-      <TableCell className="text-muted-foreground" aria-label="Never checked">
-        —
+      <TableCell className="text-muted-foreground/60" aria-label="Never checked">
+        Never
       </TableCell>
     );
   }
   return (
-    <TableCell className="text-muted-foreground" title={formatDateTime(iso)}>
-      {formatRelative(iso)}
-    </TableCell>
+    <TableCell title={formatDateTime(iso)}>{formatRelative(iso)}</TableCell>
+  );
+}
+
+/**
+ * One quiet control per row instead of two text links. Opening the domain is
+ * the row's primary action and lives on the name; the menu holds the rest,
+ * with delete set apart from navigation.
+ *
+ * A menu item closes the menu on click, so the dialog is opened by state here
+ * rather than by a trigger inside the item.
+ */
+function RowActions({ claim }: { claim: ClaimView }) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-foreground"
+              aria-label={`Actions for ${claim.domain}`}
+            />
+          }
+        >
+          <MoreHorizontalIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem render={<Link href={`/domains/${claim.id}`} />}>
+            Manage
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DeleteDomainDialog
+        claimId={claim.id}
+        domain={claim.domain}
+        isVerified={claim.state === "verified"}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={() => toast.success(`${claim.domain} deleted.`)}
+      />
+    </>
   );
 }
 
@@ -79,7 +137,7 @@ export function DomainsTable({
             <TableHead>Status</TableHead>
             <TableHead>Last checked</TableHead>
             <TableHead>Added</TableHead>
-            <TableHead className="w-40 text-right">
+            <TableHead className="w-12 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
@@ -100,7 +158,7 @@ export function DomainsTable({
               <TableCell className="font-mono">
                 <Link
                   href={`/domains/${claim.id}`}
-                  className="underline-offset-4 hover:underline"
+                  className="focus-visible:ring-ring/50 rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3"
                 >
                   {claim.domain}
                 </Link>
@@ -116,33 +174,7 @@ export function DomainsTable({
                 {formatRelative(claim.createdAt)}
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex justify-end gap-1">
-                  <Link
-                    href={`/domains/${claim.id}`}
-                    className={cn(
-                      buttonVariants({ variant: "ghost", size: "sm" }),
-                      "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    Manage
-                  </Link>
-
-                  <DeleteDomainDialog
-                    claimId={claim.id}
-                    domain={claim.domain}
-                    isVerified={claim.state === "verified"}
-                    onDeleted={() => toast.success(`${claim.domain} deleted.`)}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        Delete
-                      </Button>
-                    }
-                  />
-                </div>
+                <RowActions claim={claim} />
               </TableCell>
             </TableRow>
           ))}

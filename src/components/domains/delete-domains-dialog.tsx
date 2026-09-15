@@ -54,6 +54,7 @@ export function DeleteDomainsDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
+            variant="destructive"
             disabled={deleteClaims.isPending || count === 0}
             onClick={() =>
               deleteClaims.mutate(

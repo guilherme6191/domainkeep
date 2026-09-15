@@ -15,20 +15,32 @@ import {
 import { useDeleteClaim } from "@/hooks/use-claims";
 import { toastApiError } from "@/lib/api/toast-error";
 
+/**
+ * Two ways in: a `trigger` element that opens it, or `open`/`onOpenChange`
+ * from a parent. The second exists for the row menu, where a menu item
+ * closes the menu on click and would take a trigger down with it.
+ */
 export function DeleteDomainDialog({
   claimId,
   domain,
   isVerified,
   trigger,
+  open: controlledOpen,
+  onOpenChange,
   onDeleted,
 }: {
   claimId: string;
   domain: string;
   isVerified: boolean;
-  trigger: React.ReactElement;
+  trigger?: React.ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onDeleted?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
+
   const deleteClaim = useDeleteClaim({
     onSuccess: () => {
       setOpen(false);
@@ -38,7 +50,7 @@ export function DeleteDomainDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={trigger} />
+      {trigger ? <AlertDialogTrigger render={trigger} /> : null}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {domain}?</AlertDialogTitle>
@@ -51,6 +63,7 @@ export function DeleteDomainDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
+            variant="destructive"
             disabled={deleteClaim.isPending}
             onClick={() => deleteClaim.mutate(claimId, {
               onError: (error) => {

@@ -97,6 +97,7 @@ pnpm lint
 | Document | What it covers |
 | --- | --- |
 | [Local development](LOCAL-DEVELOPMENT.md) | Running the app locally, with the Clerk and Supabase setup and the environment reference. |
+| [docs/screenshots.md](docs/screenshots.md) | Every screen a user can reach, for anyone who would rather look than sign up. |
 | [docs/](docs/) | Product brief and technical specification: principles, scope, API contracts, state modeling, persistence, and security. |
 
 ## How this was built

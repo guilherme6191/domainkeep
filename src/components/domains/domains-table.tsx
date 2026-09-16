@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoreHorizontalIcon } from "lucide-react";
+import { Loader2, MoreHorizontalIcon } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DeleteDomainDialog } from "@/components/domains/delete-domain-dialog";
@@ -24,7 +24,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { lastCheckedAt, nextStep } from "@/lib/claim-state";
+import { useVerifyClaim } from "@/hooks/use-claims";
+import { toastApiError } from "@/lib/api/toast-error";
+import { canCheck, lastCheckedAt, nextStep } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { type PageSize } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
@@ -81,18 +83,47 @@ function StatusCell({ state }: { state: ClaimViewState }) {
 }
 
 /**
- * One quiet control per row instead of two text links. Opening the domain is
- * the row's primary action and lives on the name; the menu holds the rest,
- * with delete set apart from navigation.
+ * Opening the domain is the row's primary action and lives on the name; the
+ * menu holds the rest, with delete set apart from navigation. The check is in
+ * both places: a quiet button that surfaces when the row is under the pointer
+ * or holds keyboard focus, and a menu item, which is the only one of the two a
+ * phone can reach.
  *
  * A menu item closes the menu on click, so the dialog is opened by state here
  * rather than by a trigger inside the item.
  */
-function RowActions({ claim }: { claim: ClaimView }) {
+function RowActions({
+  claim,
+  checking,
+  onCheck,
+}: {
+  claim: ClaimView;
+  checking: boolean;
+  onCheck: () => void;
+}) {
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const checkable = canCheck(claim.state);
 
   return (
-    <>
+    <div className="flex items-center justify-end gap-0.5">
+      {checkable ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Check ${claim.domain}`}
+          onClick={onCheck}
+          className={cn(
+            "text-muted-foreground hover:text-foreground hidden transition-opacity md:inline-flex",
+            // Out of sight until the row is wanted, but never out of reach:
+            // keyboard focus brings it back, and so does a check in flight.
+            "opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100",
+            checking && "opacity-100",
+          )}
+        >
+          {checking ? <Loader2 className="animate-spin" /> : "Check"}
+        </Button>
+      ) : null}
+
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
@@ -107,6 +138,9 @@ function RowActions({ claim }: { claim: ClaimView }) {
           <MoreHorizontalIcon />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {checkable ? (
+            <DropdownMenuItem onClick={onCheck}>Check</DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem render={<Link href={`/domains/${claim.id}`} />}>
             Manage
           </DropdownMenuItem>
@@ -128,7 +162,80 @@ function RowActions({ claim }: { claim: ClaimView }) {
         onOpenChange={setDeleteOpen}
         onDeleted={() => toast.success(`${claim.domain} deleted.`)}
       />
-    </>
+    </div>
+  );
+}
+
+/**
+ * The check runs where the user asked for it. The mutation replaces this
+ * claim in every cached page with the server's answer, so the badge and the
+ * next step settle in place; only a request that never reached an answer is
+ * worth a toast. A domain that turns out to be held elsewhere changes its row
+ * and nothing more: a transfer should never be one click away from a list
+ * someone is scanning.
+ */
+function DomainRow({
+  claim,
+  selected,
+  onSelectedChange,
+}: {
+  claim: ClaimView;
+  selected: boolean;
+  onSelectedChange: (checked: boolean) => void;
+}) {
+  const verify = useVerifyClaim(claim.id);
+
+  // Neither control is disabled while the check runs: a disabled button drops
+  // the keyboard focus that is holding it on screen. A second press during the
+  // round trip is simply ignored.
+  function runCheck() {
+    if (verify.isPending) return;
+    verify.mutate(undefined, { onError: (error) => toastApiError(error) });
+  }
+
+  return (
+    <TableRow
+      data-state={selected ? "selected" : undefined}
+      aria-busy={verify.isPending || undefined}
+      className="group/row"
+    >
+      <TableCell>
+        <Checkbox
+          checked={selected}
+          onCheckedChange={onSelectedChange}
+          aria-label={`Select ${claim.domain}`}
+        />
+      </TableCell>
+      <TableCell className="w-full max-w-0 font-mono text-[13px]">
+        {/* Takes whatever width the other columns leave; a long name
+            truncates and keeps its full text on hover. */}
+        <Link
+          href={`/domains/${claim.id}`}
+          title={claim.domain}
+          className="focus-visible:ring-ring/50 block truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3"
+        >
+          {claim.domain}
+        </Link>
+      </TableCell>
+      <StatusCell state={claim.state} />
+      <TableCell className={cn(NEXT_STEP, "text-muted-foreground")}>
+        {nextStep(claim.state)}
+      </TableCell>
+      <LastCheckedCell iso={lastCheckedAt(claim)} />
+      <TableCell
+        className={cn(ADDED, "text-muted-foreground")}
+        title={formatDateTime(claim.createdAt)}
+      >
+        {formatRelative(claim.createdAt)}
+      </TableCell>
+      <TableCell className="text-right">
+        <RowActions
+          claim={claim}
+          checking={verify.isPending}
+          onCheck={runCheck}
+        />
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -183,43 +290,12 @@ export function DomainsTable({
         </TableHeader>
         <TableBody>
           {claims.map((claim) => (
-            <TableRow
+            <DomainRow
               key={claim.id}
-              data-state={selected.has(claim.id) ? "selected" : undefined}
-            >
-              <TableCell>
-                <Checkbox
-                  checked={selected.has(claim.id)}
-                  onCheckedChange={(checked) => toggleOne(claim.id, checked)}
-                  aria-label={`Select ${claim.domain}`}
-                />
-              </TableCell>
-              <TableCell className="w-full max-w-0 font-mono text-[13px]">
-                {/* Takes whatever width the other columns leave; a long name
-                    truncates and keeps its full text on hover. */}
-                <Link
-                  href={`/domains/${claim.id}`}
-                  title={claim.domain}
-                  className="focus-visible:ring-ring/50 block truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3"
-                >
-                  {claim.domain}
-                </Link>
-              </TableCell>
-              <StatusCell state={claim.state} />
-              <TableCell className={cn(NEXT_STEP, "text-muted-foreground")}>
-                {nextStep(claim.state)}
-              </TableCell>
-              <LastCheckedCell iso={lastCheckedAt(claim)} />
-              <TableCell
-                className={cn(ADDED, "text-muted-foreground")}
-                title={formatDateTime(claim.createdAt)}
-              >
-                {formatRelative(claim.createdAt)}
-              </TableCell>
-              <TableCell className="text-right">
-                <RowActions claim={claim} />
-              </TableCell>
-            </TableRow>
+              claim={claim}
+              selected={selected.has(claim.id)}
+              onSelectedChange={(checked) => toggleOne(claim.id, checked)}
+            />
           ))}
         </TableBody>
       </Table>

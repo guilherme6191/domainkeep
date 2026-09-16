@@ -5,6 +5,9 @@ import { claimView } from "@/test/claim-fixtures";
 import type { ClaimPage, ClaimViewState } from "@/lib/types";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/hooks/use-claims", () => ({
+  useVerifyClaim: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock("@/components/domains/delete-domain-dialog", () => ({
   DeleteDomainDialog: () => "Delete domain control",
 }));
@@ -64,5 +67,25 @@ describe("the list shows what to do next", () => {
     const html = rowFor("verified");
     expect(html).not.toContain("check again");
     expect(html).not.toContain("Get a new code");
+  });
+});
+
+// "Has it propagated yet" is the commonest question in the list, and it should
+// not cost a page visit. Where another lookup cannot change the answer, the
+// list offers nothing rather than a dead action.
+describe("checking from the list", () => {
+  it.each([
+    ["setup_required", true],
+    ["record_not_found", true],
+    ["value_mismatch", true],
+    ["temporary_dns_error", true],
+    ["held_by_another", false],
+    ["expired", false],
+    ["superseded", false],
+    ["verified", false],
+  ] as const)("offers a check on a %s domain: %s", (state, offered) => {
+    expect(rowFor(state).includes('aria-label="Check example.com"')).toBe(
+      offered,
+    );
   });
 });

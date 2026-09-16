@@ -13,16 +13,15 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/components/domains/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { nextStep } from "@/lib/claim-state";
 import { formatDateTimeSentence } from "@/lib/format";
 import { takeoverNoticeRemainingMs } from "@/lib/takeover-notice";
-import { VERIFICATION_VALUE_PREFIX, type ClaimView } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import {
+  VERIFICATION_VALUE_PREFIX,
+  type ClaimView,
+  type ClaimViewState,
+} from "@/lib/types";
 
 function Mono({ children }: { children: React.ReactNode }) {
   return (
@@ -30,8 +29,44 @@ function Mono({ children }: { children: React.ReactNode }) {
   );
 }
 
+// The panel opens the one card rather than sitting in a box of its own, so it
+// drops the alert's border and background and keeps its role and its layout.
+const PLAIN = "border-0 bg-transparent p-0";
+
 // Each outcome has its own glyph, so the shape says what happened before the
 // words do: nothing found, a mismatch, no answer, someone else, out of time.
+//
+// The title says what happened; the line under it says what to do, in exactly
+// the words the list used, so the page never renames the step the user came
+// here to take. The explanation follows, for whoever wants it.
+function Panel({
+  state,
+  icon,
+  title,
+  tone,
+  children,
+}: {
+  state: ClaimViewState;
+  icon: React.ReactNode;
+  title: React.ReactNode;
+  tone?: string;
+  children?: React.ReactNode;
+}) {
+  const action = nextStep(state);
+
+  return (
+    <Alert className={cn(PLAIN, tone)}>
+      {icon}
+      <AlertTitle className="text-base">{title}</AlertTitle>
+      <AlertDescription className="space-y-2">
+        {action ? (
+          <p className="text-foreground font-medium">{action}.</p>
+        ) : null}
+        {children}
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 /** The fold on the not-found checklist, owned by the page so a re-check that
  *  remounts the panel doesn't snap it shut mid-troubleshooting. */
@@ -50,182 +85,176 @@ function RecordNotFound({
   fold?: TroubleshootingFold;
 }) {
   return (
-    <Alert>
-      <SearchX />
-      <AlertTitle>We couldn&rsquo;t find the verification record yet.</AlertTitle>
-      <AlertDescription className="space-y-3">
-        <p>
-          DNS changes can take a few minutes, occasionally hours. Check again
-          shortly — your code stays valid between checks.
-        </p>
+    <Panel
+      state="record_not_found"
+      icon={<SearchX />}
+      title="We couldn’t find the verification record yet."
+    >
+      <p>
+        DNS changes can take a few minutes, occasionally hours. Your code stays
+        valid between checks.
+      </p>
 
-        <details
-          className="group"
-          open={fold?.open}
-          onToggle={(event) => fold?.onOpenChange(event.currentTarget.open)}
-        >
-          <summary className="text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm font-medium outline-none focus-visible:ring-3 [&::-webkit-details-marker]:hidden">
-            <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
-            Still missing after a while?
-          </summary>
-          <ul className="list-disc space-y-1.5 pt-2 pl-4">
-            <li>
-              The value starts with <Mono>{VERIFICATION_VALUE_PREFIX}</Mono>; a
-              bare token doesn&rsquo;t count.
-            </li>
-            <li>The value was pasted, not retyped.</li>
-            <li>
-              The record&rsquo;s full name is exactly <Mono>{claim.domain}</Mono>,
-              not the root of the zone and not a sibling.
-            </li>
-            <li>
-              The type is TXT. A name that is already a CNAME can&rsquo;t carry
-              one.
-            </li>
-          </ul>
-        </details>
-      </AlertDescription>
-    </Alert>
+      <details
+        className="group"
+        open={fold?.open}
+        onToggle={(event) => fold?.onOpenChange(event.currentTarget.open)}
+      >
+        <summary className="text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm font-medium outline-none focus-visible:ring-3 [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+          Still missing after a while?
+        </summary>
+        <ul className="list-disc space-y-1.5 pt-2 pl-4">
+          <li>
+            The value starts with <Mono>{VERIFICATION_VALUE_PREFIX}</Mono>; a
+            bare token doesn&rsquo;t count.
+          </li>
+          <li>The value was pasted, not retyped.</li>
+          <li>
+            The record&rsquo;s full name is exactly <Mono>{claim.domain}</Mono>,
+            not the root of the zone and not a sibling.
+          </li>
+          <li>
+            The type is TXT. A name that is already a CNAME can&rsquo;t carry
+            one.
+          </li>
+        </ul>
+      </details>
+    </Panel>
   );
 }
 
 // The one recoverable state where the record is definitely wrong, so it earns
-// the badge's amber. The card below shows expected and found, so the alert is
-// the headline only.
+// the badge's amber. The remedy is here rather than under the comparison, so
+// the whole recovery reads in one place.
 function ValueMismatch() {
   return (
-    <Alert className="border-amber-400/35 text-amber-300">
-      <AlertCircle />
-      <AlertTitle>
-        We found the record, but its value doesn&rsquo;t match.
-      </AlertTitle>
-    </Alert>
+    <Panel
+      state="value_mismatch"
+      icon={<AlertCircle />}
+      title="We found the record, but its value doesn’t match."
+      tone="text-amber-300"
+    >
+      <p>
+        Replace the found value with the expected one, or add it as another TXT
+        value.
+      </p>
+    </Panel>
   );
 }
 
-// Replaces the record card in the mismatch state so expected and found read
-// side by side.
-export function ExpectedVsFoundCard({ claim }: { claim: ClaimView }) {
+// Expected beside found, in place of the record table: with the value wrong,
+// what the user needs is the comparison, not the instructions again.
+export function ExpectedVsFound({ claim }: { claim: ClaimView }) {
   const observed =
     claim.lastCheck?.result === "value_mismatch"
       ? claim.lastCheck.observedValues
       : [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Expected vs. found</CardTitle>
-        <CardDescription>
+    <section className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-base font-medium">Expected vs. found</h2>
+        <p className="text-muted-foreground">
           At <Mono>{claim.verificationHostname}</Mono>
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </div>
 
-      <CardContent className="space-y-4">
-        <div className="grid gap-6 sm:grid-cols-[1fr_1px_1fr]">
-          <div className="space-y-2.5">
-            <div className="text-muted-foreground text-sm font-medium">
-              Expected
-            </div>
-            <div className="flex items-start gap-2">
-              <code className="min-w-0 flex-1 font-mono text-sm leading-relaxed break-all">
-                {claim.recordValue}
-              </code>
-              <CopyButton
-                value={claim.recordValue}
-                label="expected value"
-                className="size-6 shrink-0"
-              />
-            </div>
+      <div className="grid gap-6 sm:grid-cols-[1fr_1px_1fr]">
+        <div className="space-y-2.5">
+          <div className="text-muted-foreground text-sm font-medium">
+            Expected
           </div>
-
-          <div className="bg-border hidden sm:block" />
-
-          <div className="space-y-2.5">
-            <div className="text-muted-foreground text-sm font-medium">
-              Found at this name
-            </div>
-            {observed.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                No values were readable.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {observed.map((value) => (
-                  <li key={value} className="flex items-start gap-2">
-                    <span
-                      aria-hidden
-                      className="text-muted-foreground shrink-0 text-sm leading-relaxed"
-                    >
-                      ×
-                    </span>
-                    <code className="text-muted-foreground min-w-0 font-mono text-sm leading-relaxed break-all">
-                      {value}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="flex items-start gap-2">
+            <code className="min-w-0 flex-1 font-mono text-sm leading-relaxed break-all">
+              {claim.recordValue}
+            </code>
+            <CopyButton
+              value={claim.recordValue}
+              label="expected value"
+              className="size-6 shrink-0"
+            />
           </div>
         </div>
 
-        <p className="text-muted-foreground text-sm">
-          Replace the found value with the expected one, or add it as another
-          TXT value, then check again.
-        </p>
-      </CardContent>
-    </Card>
+        <div className="bg-border hidden sm:block" />
+
+        <div className="space-y-2.5">
+          <div className="text-muted-foreground text-sm font-medium">
+            Found at this name
+          </div>
+          {observed.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No values were readable.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {observed.map((value) => (
+                <li key={value} className="flex items-start gap-2">
+                  <span
+                    aria-hidden
+                    className="text-muted-foreground shrink-0 text-sm leading-relaxed"
+                  >
+                    ×
+                  </span>
+                  <code className="text-muted-foreground min-w-0 font-mono text-sm leading-relaxed break-all">
+                    {value}
+                  </code>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
 /**
- * Carries the same neutral colour as the diagnostic panels, because it is the
- * outcome of a check like any of them — but what it asks for is a decision
- * rather than a fix. The Take over button lives in the header card above,
- * beside Generate a new code.
+ * What it asks for is a decision rather than a fix, so the panel says what a
+ * takeover would do and what leaving it alone costs. Both answers are under
+ * it: the transfer, and the way back to the list.
  */
 function HeldByAnother({ claim }: { claim: ClaimView }) {
   return (
-    <Alert>
-      <Lock />
-      <AlertTitle>
-        Your record matched, but another account holds {claim.domain}.
-      </AlertTitle>
-      <AlertDescription className="space-y-2">
-        <p>
-          Nothing has moved and nobody has been told. Take it over and the
-          domain becomes yours, and the other account is told it moved.
-        </p>
-        <p>
-          If that isn&rsquo;t expected, check with whoever manages the domain
-          first.
-        </p>
-      </AlertDescription>
-    </Alert>
+    <Panel
+      state="held_by_another"
+      icon={<Lock />}
+      title={`Your record matched, but another account holds ${claim.domain}.`}
+    >
+      <p>
+        Nothing has moved and nobody has been told. Take it over and the domain
+        becomes yours, and the other account is told it moved.
+      </p>
+      <p>
+        If that isn&rsquo;t expected, check with whoever manages the domain
+        first.
+      </p>
+    </Panel>
   );
 }
 
 function TemporaryDnsError() {
   return (
-    <Alert>
-      <CloudOff />
-      <AlertTitle>
-        DNS didn&rsquo;t respond. Your record may still be correct.
-      </AlertTitle>
-      <AlertDescription>
-        We couldn&rsquo;t complete the lookup. There&rsquo;s nothing to change
-        yet — click Check again to retry.
-      </AlertDescription>
-    </Alert>
+    <Panel
+      state="temporary_dns_error"
+      icon={<CloudOff />}
+      title="DNS didn’t respond. Your record may still be correct."
+    >
+      <p>We couldn&rsquo;t complete the lookup. There&rsquo;s nothing to change.</p>
+    </Panel>
   );
 }
 
 function Expired() {
   return (
-    <Alert>
-      <Hourglass />
-      <AlertTitle>This verification code has expired.</AlertTitle>
-      <AlertDescription>Codes are valid for seven days.</AlertDescription>
-    </Alert>
+    <Panel
+      state="expired"
+      icon={<Hourglass />}
+      title="This verification code has expired."
+    >
+      <p>Codes are valid for seven days.</p>
+    </Panel>
   );
 }
 
@@ -242,44 +271,51 @@ function RecentTakeoverNotice({ tookOverAt }: { tookOverAt: string }) {
 }
 
 // The one outcome worth a beat: the check mark lands a moment after the
-// panel, so success reads as an event rather than another state.
+// panel, so success reads as an event rather than another state. Nothing is
+// asked of the user, so the panel has no action line.
 function Verified({ claim }: { claim: ClaimView }) {
   return (
-    <Alert className="border-emerald-400/35 text-emerald-300">
-      <CircleCheck className="motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:fill-mode-backwards motion-safe:delay-150 motion-safe:duration-300" />
-      <AlertTitle>You control {claim.domain}.</AlertTitle>
-      <AlertDescription className="space-y-2">
-        <p>
-          {claim.verifiedAt
-            ? `Verified on ${formatDateTimeSentence(claim.verifiedAt)}.`
-            : "DNS control confirmed at the time of the check."}
-        </p>
-        <p>
-          You can remove the <Mono>{VERIFICATION_VALUE_PREFIX}</Mono> TXT
-          value from <Mono>{claim.domain}</Mono> now if you&rsquo;d like.
-        </p>
-        {claim.tookOverAt ? (
-          <RecentTakeoverNotice key={claim.tookOverAt} tookOverAt={claim.tookOverAt} />
-        ) : null}
-      </AlertDescription>
-    </Alert>
+    <Panel
+      state="verified"
+      icon={
+        <CircleCheck className="motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:fill-mode-backwards motion-safe:delay-150 motion-safe:duration-300" />
+      }
+      title={`You control ${claim.domain}.`}
+      tone="text-emerald-300"
+    >
+      <p>
+        {claim.verifiedAt
+          ? `Verified on ${formatDateTimeSentence(claim.verifiedAt)}.`
+          : "DNS control confirmed at the time of the check."}
+      </p>
+      <p>
+        You can remove the <Mono>{VERIFICATION_VALUE_PREFIX}</Mono> TXT value
+        from <Mono>{claim.domain}</Mono> now if you&rsquo;d like.
+      </p>
+      {claim.tookOverAt ? (
+        <RecentTakeoverNotice key={claim.tookOverAt} tookOverAt={claim.tookOverAt} />
+      ) : null}
+    </Panel>
   );
 }
 
 function Superseded({ claim }: { claim: ClaimView }) {
   return (
-    <Alert className="border-red-400/35 text-red-300">
-      <AlertTriangle />
-      <AlertTitle>Another account proved control of {claim.domain}.</AlertTitle>
-      <AlertDescription>
+    <Panel
+      state="superseded"
+      icon={<AlertTriangle />}
+      title={`Another account proved control of ${claim.domain}.`}
+      tone="text-red-300"
+    >
+      <p>
         {claim.verifiedAt
           ? `You verified this domain on ${formatDateTimeSentence(claim.verifiedAt)}, and it has since moved. `
           : null}
-        If you still control its DNS, generate a new code and verify again —
-        you&rsquo;ll be asked to confirm before it moves back. Check with
-        whoever manages this domain first on who should hold it.
-      </AlertDescription>
-    </Alert>
+        A new code verifies control again — you&rsquo;ll be asked to confirm
+        before it moves back. Check with whoever manages this domain first on
+        who should hold it.
+      </p>
+    </Panel>
   );
 }
 

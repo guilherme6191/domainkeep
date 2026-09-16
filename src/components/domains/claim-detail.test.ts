@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@/lib/api/client";
 import { NOW, claimView } from "@/test/claim-fixtures";
+import type { ClaimViewState } from "@/lib/types";
 
 const { useClaimMock } = vi.hoisted(() => ({ useClaimMock: vi.fn() }));
 
@@ -63,6 +64,35 @@ describe("claim detail loading errors", () => {
   });
 });
 
+// A filled button is the page's one primary action; everything else is a
+// ghost, a link or a quiet control.
+function primaryCount(html: string) {
+  return html.split("bg-primary text-primary-foreground").length - 1;
+}
+
+// A claim in each state, with the check history that state implies.
+function detailFor(state: ClaimViewState) {
+  const checked = { checkedAt: NOW.toISOString() };
+  const lastCheck =
+    state === "setup_required" || state === "expired" || state === "verified"
+      ? null
+      : state === "value_mismatch"
+        ? { result: "value_mismatch" as const, observedValues: ["wrong"], ...checked }
+        : state === "superseded"
+          ? null
+          : { result: state as "record_not_found", ...checked };
+
+  useClaimMock.mockReturnValue({
+    data: claimView({
+      state,
+      lastCheck,
+      verifiedAt: state === "verified" || state === "superseded" ? NOW.toISOString() : null,
+      supersededAt: state === "superseded" ? NOW.toISOString() : null,
+    }),
+  });
+  return render();
+}
+
 describe("claim detail verified view", () => {
   it("shows no record and no struck-through value once the token has aged out", () => {
     const claim = claimView({
@@ -77,7 +107,7 @@ describe("claim detail verified view", () => {
     const html = render();
     expect(html).not.toContain(claim.recordValue);
     expect(html).not.toContain("line-through");
-    expect(html).not.toContain("Generate a new code");
+    expect(html).not.toContain("Get a new code");
     expect(html).toContain("Delete domain control");
     expect(html).toContain("You can remove the");
   });
@@ -92,20 +122,71 @@ describe("claim detail announcements", () => {
 
 describe("claim detail held by another account", () => {
   // The proof already matched, so there is nothing left to check: the claim is
-  // asked to decide instead. Nothing has moved and nobody has been told yet.
-  it("offers Take over instead of another check", () => {
-    useClaimMock.mockReturnValue({
-      data: claimView({
-        state: "held_by_another",
-        lastCheck: { result: "held_by_another", checkedAt: NOW.toISOString() },
-      }),
-    });
-    const html = render();
+  // asked to decide instead. Nothing has moved and nobody has been told yet,
+  // and leaving it alone is an answer, so it is offered — quietly.
+  it("offers Take over instead of another check, and a way to leave it", () => {
+    const html = detailFor("held_by_another");
     expect(html).toContain("Take over");
+    expect(html).toContain("Leave it");
     expect(html).not.toContain("Check again");
     expect(html).not.toContain("Verify domain");
     expect(html).toContain("another account holds example.com");
-    expect(html).toContain("Generate a new code");
+  });
+});
+
+// The whole point of the page: at any moment there is one thing to press, and
+// it is the thing that moves the domain towards verification.
+describe("claim detail: one pending action", () => {
+  it.each([
+    ["setup_required", "Verify domain"],
+    ["record_not_found", "Check again"],
+    ["value_mismatch", "Check again"],
+    ["temporary_dns_error", "Check again"],
+    ["held_by_another", "Take over"],
+    ["expired", "Get a new code"],
+    ["superseded", "Get a new code"],
+  ] as const)("a %s domain is asked to %s", (state, label) => {
+    const html = detailFor(state);
+    expect(primaryCount(html)).toBe(1);
+    expect(html).toContain(label);
+  });
+
+  it("asks nothing of a verified domain", () => {
+    expect(primaryCount(detailFor("verified"))).toBe(0);
+  });
+
+  // An escape hatch while the code still works, the only way out once it
+  // doesn't. Never both, and never competing with the check.
+  it("keeps a new code quiet while the current one is alive", () => {
+    const html = detailFor("record_not_found");
+    expect(html).toContain("Get a new code");
+    expect(primaryCount(html)).toBe(1);
+    expect(html).toContain("Check again");
+  });
+});
+
+describe("claim detail progress cue", () => {
+  it.each([
+    ["setup_required", "Add record"],
+    ["record_not_found", "Add record"],
+    ["value_mismatch", "Check"],
+    ["held_by_another", "Check"],
+    ["verified", "Verified"],
+    ["expired", "Get a new code"],
+    ["superseded", "Get a new code"],
+  ] as const)("puts a %s domain at %s", (state, step) => {
+    const html = detailFor(state);
+    const current = html.match(/<li[^>]*aria-current="step"[^>]*>(.*?)<\/li>/);
+    expect(current).not.toBeNull();
+    expect(current![1]).toContain(step);
+    expect(html.split('aria-current="step"')).toHaveLength(2);
+  });
+
+  it("walks the three steps in order, as a list", () => {
+    const html = detailFor("setup_required");
+    expect(html).toMatch(
+      /<ol[^>]*>[\s\S]*Add record[\s\S]*Check[\s\S]*Verified[\s\S]*<\/ol>/,
+    );
   });
 });
 

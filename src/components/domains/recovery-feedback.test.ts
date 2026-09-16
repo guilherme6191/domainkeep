@@ -45,7 +45,7 @@ vi.mock("@/components/ui/alert-dialog", () => {
 });
 
 const { CopyButton } = await import("@/components/domains/copy-button");
-const { DnsRecordCard } = await import("@/components/domains/dns-record-card");
+const { DnsRecord } = await import("@/components/domains/dns-record");
 const { DeleteDomainDialog } = await import("@/components/domains/delete-domain-dialog");
 const VALUE = `${VERIFICATION_VALUE_PREFIX}${"a".repeat(64)}`;
 
@@ -58,7 +58,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("copy recovery", () => {
   it("shows a short form of the value and keeps the full one on the copy button", () => {
-    const html = renderToStaticMarkup(createElement(DnsRecordCard, {
+    const html = renderToStaticMarkup(createElement(DnsRecord, {
       value: VALUE,
       hostname: "example.com",
     }));

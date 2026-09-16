@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Clock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ClaimStatePanel,
-  ExpectedVsFoundCard,
+  ExpectedVsFound,
 } from "@/components/domains/claim-state-panel";
 import { CopyButton } from "@/components/domains/copy-button";
 import { DeleteDomainDialog } from "@/components/domains/delete-domain-dialog";
-import { DnsRecordCard } from "@/components/domains/dns-record-card";
+import { DnsRecord } from "@/components/domains/dns-record";
 import { EditDomainDialog } from "@/components/domains/edit-domain-dialog";
 import { StatusBadge } from "@/components/domains/status-badge";
 import { TakeoverDialog } from "@/components/domains/takeover-dialog";
@@ -50,11 +50,13 @@ function Meta({
   iso,
   icon,
   urgent = false,
+  action,
 }: {
   label: string;
   iso: string;
   icon?: React.ReactNode;
   urgent?: boolean;
+  action?: React.ReactNode;
 }) {
   return (
     <div className={cn("flex items-center gap-1.5", urgent && "text-amber-300")}>
@@ -65,6 +67,12 @@ function Meta({
       <dd className={cn(!urgent && "text-foreground")} title={formatDateTime(iso)}>
         {formatRelative(iso)}
       </dd>
+      {action ? (
+        <>
+          <span aria-hidden>·</span>
+          {action}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -73,8 +81,19 @@ function Meta({
  * The one piece of metadata that is a deadline rather than history. It stays
  * quiet for most of the week and turns amber inside the last day, when the
  * user should act on it before the record they published stops counting.
+ *
+ * While the code is alive its replacement belongs here, beside the date that
+ * prompts the question, and quiet: it is an escape hatch, not the next step.
+ * Once the code is dead it leaves for the card below, where it is the only
+ * thing left to do.
  */
-function CodeExpiry({ claim }: { claim: ClaimView }) {
+function CodeExpiry({
+  claim,
+  newCode,
+}: {
+  claim: ClaimView;
+  newCode: React.ReactNode;
+}) {
   if (claim.state === "verified") return null;
 
   return (
@@ -89,7 +108,64 @@ function CodeExpiry({ claim }: { claim: ClaimView }) {
       iso={claim.tokenExpiresAt}
       icon={<Clock className="size-3.5" aria-hidden />}
       urgent={codeExpiryIsUrgent(claim)}
+      action={codeIsDead(claim) ? null : newCode}
     />
+  );
+}
+
+/**
+ * Three steps on one line, so the page answers "where am I in this?" before
+ * the user reads a word of the card. A step counts as done from what the
+ * system has actually seen: a check that found the record clears the first
+ * one, whatever it then said about the value. A dead code renames the first
+ * step, because nothing else can move until it is replaced.
+ */
+function ProgressCue({ state }: { state: ClaimViewState }) {
+  const needsNewCode = state === "expired" || state === "superseded";
+  const recordFound =
+    state === "value_mismatch" ||
+    state === "held_by_another" ||
+    state === "verified";
+  const verified = state === "verified";
+  const current = verified ? 3 : recordFound ? 2 : 1;
+
+  const steps = [
+    { label: needsNewCode ? "Get a new code" : "Add record", done: recordFound },
+    { label: "Check", done: verified },
+    { label: "Verified", done: verified },
+  ];
+
+  return (
+    <ol className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+      {steps.map((step, index) => {
+        const isCurrent = current === index + 1;
+        return (
+          <li
+            key={step.label}
+            aria-current={isCurrent ? "step" : undefined}
+            className={cn(
+              "flex items-center gap-1.5",
+              !isCurrent && !step.done && "text-muted-foreground/60",
+              isCurrent && "text-foreground font-medium",
+              isCurrent && needsNewCode && index === 0 && "text-amber-300",
+            )}
+          >
+            {step.done ? (
+              <Check className="size-3.5" aria-hidden />
+            ) : (
+              <span aria-hidden>{index + 1}.</span>
+            )}
+            {step.label}
+            {index < steps.length - 1 ? (
+              <ChevronRight
+                className="text-muted-foreground/40 size-3.5"
+                aria-hidden
+              />
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -124,8 +200,8 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-8 w-28" />
         </div>
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-56 w-full" />
       </div>
     );
   }
@@ -166,7 +242,6 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
   const needsNewCode = codeIsDead(claim);
   const isHeld = claim.state === "held_by_another";
   const checkedBefore = claim.lastCheck !== null;
-  const verifyLabel = checkedBefore ? "Check again" : "Verify domain";
   const lastChecked = lastCheckedAt(claim);
   const showComparison = claim.state === "value_mismatch";
 
@@ -190,8 +265,14 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     });
   }
 
+  function replaceCode() {
+    replaceToken.mutate(undefined, {
+      onError: (error) => toastApiError(error),
+    });
+  }
+
   // Quiet in the top bar: deletion is rare, and it should never outweigh the
-  // check. It turns red only under the pointer or keyboard focus.
+  // next step. It turns red only under the pointer or keyboard focus.
   const deleteDomain = (
     <DeleteDomainDialog
       claimId={claim.id}
@@ -213,20 +294,18 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     />
   );
 
-  // The only way back for a claim whose code is dead, and an escape hatch
-  // beside every other pending action.
-  const newCode = (
+  const newCodeLabel = replaceToken.isPending
+    ? "Generating…"
+    : "Get a new code";
+
+  const newCodeLink = (
     <Button
-      variant={needsNewCode ? "default" : "ghost"}
-      title={
-        needsNewCode
-          ? undefined
-          : "Invalidates the current code. You'll need to update the TXT record."
-      }
-      onClick={() => replaceToken.mutate(undefined, { onError: (error) => toastApiError(error) })}
-      disabled={replaceToken.isPending}
+      variant="link"
+      className="h-auto p-0 text-[13px] font-normal"
+      title="Invalidates the current code. You'll need to update the TXT record."
+      onClick={replaceCode}
     >
-      {replaceToken.isPending ? "Generating…" : "Generate a new code"}
+      {newCodeLabel}
     </Button>
   );
 
@@ -242,7 +321,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
             verify.isPending && "invisible",
           )}
         >
-          {verifyLabel}
+          {checkedBefore ? "Check again" : "Verify domain"}
         </span>
         <span
           className={cn(
@@ -257,20 +336,30 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     </Button>
   );
 
-  // The primary action sits in the header beside the status it acts on, so
-  // the page reads status, then what to do about it, then how. Verified has
-  // nothing left to do. A dead code leaves only its replacement. Otherwise
-  // one primary action stands beside the escape hatch: a claim that has
-  // already proved control is asked to decide, every other one to check.
-  const actions = isVerified ? null : (
+  // One pending action, at the foot of the content it acts on, so reading the
+  // page top to bottom ends at the button. Verified has nothing left to do. A
+  // dead code leaves only its replacement. A claim that has already proved
+  // control is asked to decide, with leaving it alone a quiet answer beside
+  // the transfer; every other one is asked to check.
+  const action = isVerified ? null : needsNewCode ? (
+    <Button onClick={replaceCode} disabled={replaceToken.isPending}>
+      {newCodeLabel}
+    </Button>
+  ) : isHeld ? (
     <>
-      {newCode}
-      {needsNewCode ? null : isHeld ? (
-        <Button onClick={() => setTakeoverOpen(true)}>Take over</Button>
-      ) : (
-        verifyButton
-      )}
+      <Button onClick={() => setTakeoverOpen(true)}>Take over</Button>
+      <Link
+        href="/domains"
+        className={cn(
+          buttonVariants({ variant: "ghost" }),
+          "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        Leave it
+      </Link>
     </>
+  ) : (
+    verifyButton
   );
 
   return (
@@ -289,77 +378,81 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         {deleteDomain}
       </div>
 
-      <Card>
-        <CardContent className="space-y-5">
-          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-            <div className="min-w-0 space-y-2">
-              <StatusBadge state={claim.state} />
-              {/* The controls sit beside the heading, not inside it, so its
-                  accessible name is the domain alone. */}
-              <div className="flex min-w-0 items-center gap-1">
-                <h1 className="truncate font-mono text-lg font-semibold tracking-tight">
-                  {claim.domain}
-                </h1>
-                <CopyButton
-                  value={claim.domain}
-                  label="domain"
-                  className="size-6 shrink-0"
-                />
-                {claim.verifiedAt !== null ? null : (
-                  <EditDomainDialog claimId={claim.id} domain={claim.domain} />
-                )}
-              </div>
-            </div>
+      {/* A plain block, not a card: the domain and its dates are the page's
+          heading, and the card below is the thing to act on. */}
+      <div className="space-y-2.5">
+        <StatusBadge state={claim.state} />
+        {/* The controls sit beside the heading, not inside it, so its
+            accessible name is the domain alone. */}
+        <div className="flex min-w-0 items-center gap-1">
+          <h1 className="truncate font-mono text-lg font-semibold tracking-tight">
+            {claim.domain}
+          </h1>
+          <CopyButton
+            value={claim.domain}
+            label="domain"
+            className="size-6 shrink-0"
+          />
+          {claim.verifiedAt !== null ? null : (
+            <EditDomainDialog claimId={claim.id} domain={claim.domain} />
+          )}
+        </div>
 
-            {actions ? (
-              <div className="flex flex-wrap items-center gap-2">{actions}</div>
-            ) : null}
-          </div>
+        <dl className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
+          <Meta label="Added" iso={claim.createdAt} />
+          {lastChecked ? <Meta label="Last checked" iso={lastChecked} /> : null}
+          <CodeExpiry claim={claim} newCode={newCodeLink} />
+        </dl>
+      </div>
 
-          <dl className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
-            <Meta label="Added" iso={claim.createdAt} />
-            {lastChecked ? (
-              <Meta label="Last checked" iso={lastChecked} />
-            ) : null}
-            <CodeExpiry claim={claim} />
-          </dl>
-        </CardContent>
-      </Card>
+      <ProgressCue state={claim.state} />
 
       <p className="sr-only" role="status" aria-live="polite">
         {announcement}
       </p>
 
       {/* Keyed on the check count, not the state: a repeat miss should still
-          visibly answer the click. The whole block dims while a check is in
-          flight, so the page shows work in progress, not a stuck button. */}
+          visibly answer the click. The card dims while a check is in flight,
+          so the page shows work in progress, not a stuck button. */}
       <div
         key={checks}
         aria-busy={verify.isPending || undefined}
         className={cn(
-          "space-y-5 transition-opacity duration-300",
+          "transition-opacity duration-300",
           checks > 0 &&
             "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 motion-safe:duration-300",
           verify.isPending && "opacity-60",
         )}
       >
-        <ClaimStatePanel
-          claim={claim}
-          fold={{ open: troubleshootingOpen, onOpenChange: setTroubleshootingOpen }}
-        />
+        <Card>
+          <CardContent className="space-y-5">
+            <ClaimStatePanel
+              claim={claim}
+              fold={{
+                open: troubleshootingOpen,
+                onOpenChange: setTroubleshootingOpen,
+              }}
+            />
 
-        {/* Verification is point-in-time, so a verified claim has no record to
-            show: the proof is done and the TXT value has no ongoing job. */}
-        {isVerified ? null : showComparison ? (
-          <ExpectedVsFoundCard claim={claim} />
-        ) : (
-          <DnsRecordCard
-            value={claim.recordValue}
-            hostname={claim.verificationHostname}
-            title={needsNewCode ? "Previous record" : "Add this DNS record"}
-            inactive={needsNewCode}
-          />
-        )}
+            {/* Verification is point-in-time, so a verified claim has no record
+                to show: the proof is done and the TXT value has no ongoing job.
+                A held domain is waiting on a decision, not on its record. */}
+            {isVerified || isHeld ? null : showComparison ? (
+              <ExpectedVsFound claim={claim} />
+            ) : (
+              <DnsRecord
+                value={claim.recordValue}
+                hostname={claim.verificationHostname}
+                title={needsNewCode ? "Previous record" : "Add this DNS record"}
+                inactive={needsNewCode}
+              />
+            )}
+
+            {action ? (
+              <div className="flex flex-wrap items-center gap-2">{action}</div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
 
       <TakeoverDialog

@@ -1,7 +1,6 @@
 import { Info } from "lucide-react";
 import { CopyButton } from "@/components/domains/copy-button";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { recordName } from "@/lib/domain";
 import { VERIFICATION_VALUE_PREFIX } from "@/lib/types";
@@ -81,10 +80,14 @@ function NameHelp({ hostname }: { hostname: string }) {
 }
 
 /**
- * `inactive` is the expired case: shown for reference, dimmed, not copyable.
- * The way out, a new code, lives in the header card above.
+ * A section of the page's one card, not a card of its own: the record, the
+ * button that checks it and whatever explains the last check all belong to
+ * the same step.
+ *
+ * `inactive` is the dead-code case: shown for reference, dimmed, not copyable.
+ * The way out, a new code, is the button below it.
  */
-export function DnsRecordCard({
+export function DnsRecord({
   value,
   hostname,
   title = "Add this DNS record",
@@ -98,12 +101,10 @@ export function DnsRecordCard({
   const name = recordName(hostname);
 
   return (
-    <Card>
-      <CardHeader className={cn(inactive && "opacity-40")}>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
+    <section className={cn("space-y-3", inactive && "opacity-40")}>
+      <h2 className="text-base font-medium">{title}</h2>
 
-      <CardContent className={cn(inactive && "opacity-40")}>
+      <div>
         <div className="overflow-hidden rounded-lg border">
           <div
             className={cn(
@@ -169,7 +170,7 @@ export function DnsRecordCard({
             . Add it alongside any TXT values already there, such as SPF.
           </p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

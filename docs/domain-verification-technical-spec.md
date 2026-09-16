@@ -59,7 +59,7 @@ The list route wraps that projection in a page envelope, so the client never har
 
 ```ts
 interface ClaimPage {
-  items: ClaimView[];  // newest first, then id ascending
+  items: ClaimView[];  // work left first, then newest, then id ascending
   page: number;
   pageSize: number;    // 40, 80, or 120; anything else is read as 40
   total: number;       // all of the caller's claims, not this page
@@ -78,7 +78,7 @@ A domain held elsewhere produces the same creation response and DNS diagnoses as
 
 | Method and route | Success | Body in | Body out |
 | --- | --- | --- | --- |
-| `GET /api/claims?page=N&pageSize=M` | `200` | — | `ClaimPage`, newest first |
+| `GET /api/claims?page=N&pageSize=M` | `200` | — | `ClaimPage`, domains with work left first |
 | `POST /api/claims` | `201` new, `200` existing | `{ domain: string }` | `ClaimView` |
 | `GET /api/claims/:id` | `200` | — | `ClaimView` |
 | `PATCH /api/claims/:id` | `200` | `{ domain: string }` | `ClaimView` |
@@ -330,7 +330,7 @@ WHERE verified_at IS NOT NULL
   AND superseded_at IS NULL;
 ```
 
-The index excludes pending and superseded rows. Its actual migration uses the equivalent `is_currently_verified` helper. A uniqueness conflict or an inactive challenge causes the route to reload and return the current claim with `200`; missing claims return `404`. No advisory lock or automatic retry is used. A later user-requested check can transfer the domain again with valid proof and a fresh confirmation.
+The index excludes pending and superseded rows. Its actual migration uses the equivalent `is_currently_verified` helper, and the same expression is stored on each row as a generated `currently_verified` column, which the list orders on so that the domains still needing something sit above the finished ones and every page agrees on the split. A uniqueness conflict or an inactive challenge causes the route to reload and return the current claim with `200`; missing claims return `404`. No advisory lock or automatic retry is used. A later user-requested check can transfer the domain again with valid proof and a fresh confirmation.
 
 ### Notifying the displaced holder
 

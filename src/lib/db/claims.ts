@@ -126,6 +126,9 @@ export async function listClaims(
         .from(TABLE)
         .select(COLUMNS, { count: "exact" })
         .eq("owner_id", ownerId)
+        // A stored column, so every page agrees on which group a row is in:
+        // false sorts first, putting the domains with work left on top.
+        .order("currently_verified", { ascending: true })
         .order("created_at", { ascending: false })
         // Ties on created_at would otherwise shuffle rows between page requests.
         .order("id", { ascending: true })

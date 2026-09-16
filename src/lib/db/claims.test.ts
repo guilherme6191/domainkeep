@@ -70,8 +70,11 @@ describe("listClaims", () => {
     const [url, init] = fetchMock.mock.calls[0];
     const query = new URL(String(url)).searchParams;
     expect(query.get("owner_id")).toBe("eq.user-owner");
-    // id breaks created_at ties, so offsets stay deterministic across pages.
-    expect(query.get("order")).toBe("created_at.desc,id.asc");
+    // Domains that still need something come first, newest first inside each
+    // group; id breaks created_at ties, so offsets stay deterministic.
+    expect(query.get("order")).toBe(
+      "currently_verified.asc,created_at.desc,id.asc",
+    );
     expect(query.get("offset")).toBe("80");
     expect(query.get("limit")).toBe("40");
     expect(String(new Headers(init?.headers).get("prefer"))).toContain("count=exact");

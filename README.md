@@ -57,7 +57,7 @@ The exclusivity rule lives in Postgres, not in application code: a partial uniqu
 
 | Route | What it's for |
 | --- | --- |
-| `GET /api/claims?page=N&pageSize=M` | One page of your domains, newest first, with the true total. |
+| `GET /api/claims?page=N&pageSize=M` | One page of your domains, the ones that still need something first, with the true total. |
 | `POST /api/claims` | Add a domain and issue its TXT challenge. Never checks DNS. Idempotent per account and domain. |
 | `DELETE /api/claims` | Remove the selected claims in one owner-filtered statement. |
 | `GET /api/claims/:id` | One claim, with its derived state. |

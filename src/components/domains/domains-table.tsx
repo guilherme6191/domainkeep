@@ -24,21 +24,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { lastCheckedAt } from "@/lib/claim-state";
+import { lastCheckedAt, nextStep } from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { type PageSize } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
-import type { ClaimPage, ClaimView } from "@/lib/types";
+import type { ClaimPage, ClaimView, ClaimViewState } from "@/lib/types";
 
 // Column headings sit a step below the data in size and colour, so the eye
 // lands on the rows, not the labels.
 const HEAD = "text-muted-foreground text-xs font-medium";
 
-// On a phone the table keeps the name, the status and the menu; the two
-// timestamps return as the viewport widens, most recent first. Nothing
-// scrolls sideways.
+// On a phone the table keeps the name, the status and the menu; the next step
+// rides under the badge there and claims a column of its own once there is
+// room, and the two timestamps return as the viewport widens, most recent
+// first. Nothing scrolls sideways.
 const LAST_CHECKED = "hidden sm:table-cell";
 const ADDED = "hidden md:table-cell";
+const NEXT_STEP = "hidden md:table-cell";
 
 function LastCheckedCell({ iso }: { iso: string | null }) {
   if (!iso) {
@@ -54,6 +56,26 @@ function LastCheckedCell({ iso }: { iso: string | null }) {
   return (
     <TableCell className={LAST_CHECKED} title={formatDateTime(iso)}>
       {formatRelative(iso)}
+    </TableCell>
+  );
+}
+
+/**
+ * The state and, below the medium breakpoint, what to do about it. A phone has
+ * no room for a column of its own, and guidance that scrolls off the side is
+ * guidance the user never reads.
+ */
+function StatusCell({ state }: { state: ClaimViewState }) {
+  const step = nextStep(state);
+
+  return (
+    <TableCell className="align-top">
+      <StatusBadge state={state} />
+      {step ? (
+        <div className="text-muted-foreground mt-1 text-xs whitespace-normal md:hidden">
+          {step}
+        </div>
+      ) : null}
     </TableCell>
   );
 }
@@ -151,6 +173,7 @@ export function DomainsTable({
             </TableHead>
             <TableHead className={cn(HEAD, "w-full")}>Domain</TableHead>
             <TableHead className={HEAD}>Status</TableHead>
+            <TableHead className={cn(HEAD, NEXT_STEP)}>Next step</TableHead>
             <TableHead className={cn(HEAD, LAST_CHECKED)}>Last checked</TableHead>
             <TableHead className={cn(HEAD, ADDED)}>Added</TableHead>
             <TableHead className="w-12 text-right">
@@ -182,8 +205,9 @@ export function DomainsTable({
                   {claim.domain}
                 </Link>
               </TableCell>
-              <TableCell>
-                <StatusBadge state={claim.state} />
+              <StatusCell state={claim.state} />
+              <TableCell className={cn(NEXT_STEP, "text-muted-foreground")}>
+                {nextStep(claim.state)}
               </TableCell>
               <LastCheckedCell iso={lastCheckedAt(claim)} />
               <TableCell

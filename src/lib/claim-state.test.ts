@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  canCheck,
   codeExpiryIsUrgent,
   getClaimViewState,
   isCurrentlyVerified,
   lastCheckedAt,
+  nextStep,
 } from "@/lib/claim-state";
 import type { DomainClaim } from "@/lib/types";
 
@@ -146,5 +148,42 @@ describe("codeExpiryIsUrgent", () => {
     ["superseded", { state: "superseded", tokenExpiresAt: hours(6 * 24) }, true],
   ] as const)("%s", (_name, view, expected) => {
     expect(codeExpiryIsUrgent(view, NOW)).toBe(expected);
+  });
+});
+
+// One sentence per state, so the list, the progress cue and the outcome panels
+// can never drift apart.
+describe("nextStep", () => {
+  it.each([
+    ["setup_required", "Add the record, then verify"],
+    ["record_not_found", "Wait, then check again"],
+    ["value_mismatch", "Fix the value, then check again"],
+    ["temporary_dns_error", "Check again"],
+    ["held_by_another", "Take over, or leave it"],
+    ["expired", "Get a new code"],
+    ["superseded", "Get a new code to reclaim"],
+  ] as const)("%s asks the user to %s", (state, expected) => {
+    expect(nextStep(state)).toBe(expected);
+  });
+
+  it("asks nothing of a verified domain", () => {
+    expect(nextStep("verified")).toBe("");
+  });
+});
+
+describe("canCheck", () => {
+  // A check can only help where the answer might change: a dead code needs
+  // replacing first, a held domain needs a decision, and verified is done.
+  it.each([
+    ["setup_required", true],
+    ["record_not_found", true],
+    ["value_mismatch", true],
+    ["temporary_dns_error", true],
+    ["held_by_another", false],
+    ["expired", false],
+    ["superseded", false],
+    ["verified", false],
+  ] as const)("%s: %s", (state, expected) => {
+    expect(canCheck(state)).toBe(expected);
   });
 });

@@ -8,21 +8,14 @@ type Presentation = {
   className?: string;
 };
 
-// The badge collapses eight states into five labels by what the user does next:
-// nothing, start, open and fix, open and decide, or open and learn the domain
-// moved. Every pending-with-a-fix state shares one "Needs attention" label. The
-// detail page names the exact state.
-// Amber means "open this", not proof of a mistake: the cause may be propagation,
-// a configuration issue, a lookup failure, an expired challenge, or a domain
-// that proved to be someone else's. Red is reserved for superseded, the one
-// state that changed against the user and has no one-click fix.
+// Every state says what it is, in the words the user would use: a list of four
+// pending domains should name four different problems, not repeat one word.
+// Amber marks the states where something is definitely off or a decision is
+// waiting; red is reserved for superseded, the one state that changed against
+// the user and has no one-click fix. Neutral is for the states where nothing
+// has gone wrong yet: never checked, and a code that simply ran out of time.
 const AMBER = "border-amber-400/35 bg-amber-500/15 text-amber-300";
-
-const NEEDS_ATTENTION: Presentation = {
-  label: "Needs attention",
-  variant: "outline",
-  className: AMBER,
-};
+const NEUTRAL = "text-muted-foreground";
 
 const PRESENTATION: Record<ClaimViewState, Presentation> = {
   verified: {
@@ -31,26 +24,36 @@ const PRESENTATION: Record<ClaimViewState, Presentation> = {
     className: "border-emerald-400/35 bg-emerald-500/15 text-emerald-300",
   },
   superseded: {
-    label: "Superseded",
+    label: "Moved away",
     variant: "outline",
     className: "border-red-400/35 bg-red-500/15 text-red-300",
   },
-  expired: NEEDS_ATTENTION,
+  expired: { label: "Code expired", variant: "outline", className: NEUTRAL },
   setup_required: {
     label: "Unchecked",
     variant: "outline",
-    className: "text-muted-foreground",
+    className: NEUTRAL,
   },
-  // Not "needs attention": nothing is broken, and the next step is a decision
-  // rather than a fix.
   held_by_another: {
     label: "Held elsewhere",
     variant: "outline",
     className: AMBER,
   },
-  record_not_found: NEEDS_ATTENTION,
-  value_mismatch: NEEDS_ATTENTION,
-  temporary_dns_error: NEEDS_ATTENTION,
+  record_not_found: {
+    label: "Record not found",
+    variant: "outline",
+    className: AMBER,
+  },
+  value_mismatch: {
+    label: "Wrong value",
+    variant: "outline",
+    className: AMBER,
+  },
+  temporary_dns_error: {
+    label: "DNS didn’t answer",
+    variant: "outline",
+    className: AMBER,
+  },
 };
 
 export function StatusBadge({ state }: { state: ClaimViewState }) {

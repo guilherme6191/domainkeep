@@ -78,3 +78,37 @@ export function codeExpiryIsUrgent(
   if (codeIsDead(claim)) return true;
   return new Date(claim.tokenExpiresAt).getTime() - now.getTime() < DAY_MS;
 }
+
+/**
+ * The one thing to do next, in the words the list row, the page's progress cue
+ * and the outcome panel all use. Keyed on the full state union so a new state
+ * cannot be added without a sentence. Verified has nothing left to ask for.
+ */
+const NEXT_STEP: Record<ClaimViewState, string> = {
+  setup_required: "Add the record, then verify",
+  record_not_found: "Wait, then check again",
+  value_mismatch: "Fix the value, then check again",
+  temporary_dns_error: "Check again",
+  held_by_another: "Take over, or leave it",
+  expired: "Get a new code",
+  superseded: "Get a new code to reclaim",
+  verified: "",
+};
+
+export function nextStep(state: ClaimViewState): string {
+  return NEXT_STEP[state];
+}
+
+/**
+ * Whether another lookup can still change the answer. A dead code has to be
+ * replaced before anything is worth checking, a held domain is waiting on a
+ * decision rather than on DNS, and a verified one is done.
+ */
+export function canCheck(state: ClaimViewState): boolean {
+  return (
+    state === "setup_required" ||
+    state === "record_not_found" ||
+    state === "value_mismatch" ||
+    state === "temporary_dns_error"
+  );
+}

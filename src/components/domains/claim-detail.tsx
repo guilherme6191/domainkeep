@@ -283,8 +283,9 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     });
   }
 
-  // Quiet in the top bar: deletion is rare, and it should never outweigh the
-  // next step. It turns red only under the pointer or keyboard focus.
+  // Up in the top bar, away from the card: deletion is rare, and it should
+  // never outweigh the next step. Its treatment is the destructive variant the
+  // row menu's delete already uses — a tint, not a filled button.
   const deleteDomain = (
     <DeleteDomainDialog
       claimId={claim.id}
@@ -295,11 +296,7 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         router.push("/domains");
       }}
       trigger={
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive focus-visible:text-destructive -mr-2 h-8"
-        >
+        <Button variant="destructive" size="sm">
           Delete domain
         </Button>
       }
@@ -381,7 +378,9 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
           href="/domains"
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground hover:text-foreground -ml-2 h-8",
+            // Pulled left so the label, not the button's padding, lines up
+            // with the content below it.
+            "text-muted-foreground hover:text-foreground -ml-2",
           )}
         >
           <ArrowLeft className="size-3.5" />

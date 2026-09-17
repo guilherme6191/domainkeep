@@ -107,7 +107,9 @@ function RecordNotFound({
         onToggle={(event) => fold?.onOpenChange(event.currentTarget.open)}
       >
         <summary className="text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm font-medium outline-none focus-visible:ring-3 [&::-webkit-details-marker]:hidden">
-          <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+          {/* Keyed off the attribute, not the `:open` pseudo-class, which not
+              every browser in use answers to yet. */}
+          <ChevronRight className="size-3.5 transition-transform group-[[open]]:rotate-90" />
           Still missing after a while?
         </summary>
         <ul className="list-disc space-y-1.5 pt-2 pl-4">

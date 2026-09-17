@@ -6,6 +6,7 @@ import {
   isCurrentlyVerified,
   lastCheckedAt,
   nextStep,
+  recordWasFound,
 } from "@/lib/claim-state";
 import type { DomainClaim } from "@/lib/types";
 
@@ -185,5 +186,22 @@ describe("canCheck", () => {
     ["verified", false],
   ] as const)("%s: %s", (state, expected) => {
     expect(canCheck(state)).toBe(expected);
+  });
+});
+
+// What the first step of the progress cue is answering: has anything of ours
+// actually appeared in DNS? A wrong value counts; a missing one does not.
+describe("recordWasFound", () => {
+  it.each([
+    ["setup_required", false],
+    ["record_not_found", false],
+    ["value_mismatch", true],
+    ["temporary_dns_error", false],
+    ["held_by_another", true],
+    ["expired", false],
+    ["superseded", false],
+    ["verified", true],
+  ] as const)("%s: %s", (state, expected) => {
+    expect(recordWasFound(state)).toBe(expected);
   });
 });

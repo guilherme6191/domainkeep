@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@/lib/api/client";
 import { NOW, claimView } from "@/test/claim-fixtures";
-import type { ClaimViewState } from "@/lib/types";
+import type { ClaimView, ClaimViewState } from "@/lib/types";
 
 const { useClaimMock } = vi.hoisted(() => ({ useClaimMock: vi.fn() }));
 
@@ -65,29 +65,41 @@ describe("claim detail loading errors", () => {
 });
 
 // A filled button is the page's one primary action; everything else is a
-// ghost, a link or a quiet control.
+// ghost, a link or a quiet control. The filled treatment has no accessible
+// name of its own, so the count goes through the class the button component
+// gives it — the alternative, a marker attribute, would put test scaffolding
+// in the product.
 function primaryCount(html: string) {
   return html.split("bg-primary text-primary-foreground").length - 1;
 }
 
-// A claim in each state, with the check history that state implies.
-function detailFor(state: ClaimViewState) {
-  const checked = { checkedAt: NOW.toISOString() };
-  const lastCheck =
-    state === "setup_required" || state === "expired" || state === "verified"
-      ? null
-      : state === "value_mismatch"
-        ? { result: "value_mismatch" as const, observedValues: ["wrong"], ...checked }
-        : state === "superseded"
-          ? null
-          : { result: state as "record_not_found", ...checked };
+const CHECKED_AT = NOW.toISOString();
 
+// The check history each state implies: a state that has never been checked,
+// or whose code died before one landed, carries none.
+const LAST_CHECK: Record<ClaimViewState, ClaimView["lastCheck"]> = {
+  setup_required: null,
+  expired: null,
+  superseded: null,
+  verified: null,
+  record_not_found: { result: "record_not_found", checkedAt: CHECKED_AT },
+  temporary_dns_error: { result: "temporary_dns_error", checkedAt: CHECKED_AT },
+  held_by_another: { result: "held_by_another", checkedAt: CHECKED_AT },
+  value_mismatch: {
+    result: "value_mismatch",
+    observedValues: ["wrong"],
+    checkedAt: CHECKED_AT,
+  },
+};
+
+function detailFor(state: ClaimViewState) {
+  const everVerified = state === "verified" || state === "superseded";
   useClaimMock.mockReturnValue({
     data: claimView({
       state,
-      lastCheck,
-      verifiedAt: state === "verified" || state === "superseded" ? NOW.toISOString() : null,
-      supersededAt: state === "superseded" ? NOW.toISOString() : null,
+      lastCheck: LAST_CHECK[state],
+      verifiedAt: everVerified ? CHECKED_AT : null,
+      supersededAt: state === "superseded" ? CHECKED_AT : null,
     }),
   });
   return render();

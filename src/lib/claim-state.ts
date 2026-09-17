@@ -80,35 +80,67 @@ export function codeExpiryIsUrgent(
 }
 
 /**
- * The one thing to do next, in the words the list row, the page's progress cue
- * and the outcome panel all use. Keyed on the full state union so a new state
- * cannot be added without a sentence. Verified has nothing left to ask for.
+ * Everything the list and the page derive from a state, in one table, so a new
+ * state cannot be added without answering all three questions.
+ *
+ * `nextStep` is the one thing to do about it, in the words the list row, the
+ * page's progress cue and the outcome panel all use; verified asks for
+ * nothing. `checkable` says whether another lookup could still change the
+ * answer: a dead code has to be replaced first, a held domain is waiting on a
+ * decision rather than on DNS, and a verified one is done. `recordFound` says
+ * whether a check has actually seen the record, whatever it then said about
+ * the value — found but wrong is further along than not found at all.
  */
-const NEXT_STEP: Record<ClaimViewState, string> = {
-  setup_required: "Add the record, then verify",
-  record_not_found: "Wait, then check again",
-  value_mismatch: "Fix the value, then check again",
-  temporary_dns_error: "Check again",
-  held_by_another: "Take over, or leave it",
-  expired: "Get a new code",
-  superseded: "Get a new code to reclaim",
-  verified: "",
+const BY_STATE: Record<
+  ClaimViewState,
+  { nextStep: string; checkable: boolean; recordFound: boolean }
+> = {
+  setup_required: {
+    nextStep: "Add the record, then verify",
+    checkable: true,
+    recordFound: false,
+  },
+  record_not_found: {
+    nextStep: "Wait, then check again",
+    checkable: true,
+    recordFound: false,
+  },
+  value_mismatch: {
+    nextStep: "Fix the value, then check again",
+    checkable: true,
+    recordFound: true,
+  },
+  temporary_dns_error: {
+    nextStep: "Check again",
+    checkable: true,
+    recordFound: false,
+  },
+  held_by_another: {
+    nextStep: "Take over, or leave it",
+    checkable: false,
+    recordFound: true,
+  },
+  expired: {
+    nextStep: "Get a new code",
+    checkable: false,
+    recordFound: false,
+  },
+  superseded: {
+    nextStep: "Get a new code to reclaim",
+    checkable: false,
+    recordFound: false,
+  },
+  verified: { nextStep: "", checkable: false, recordFound: true },
 };
 
 export function nextStep(state: ClaimViewState): string {
-  return NEXT_STEP[state];
+  return BY_STATE[state].nextStep;
 }
 
-/**
- * Whether another lookup can still change the answer. A dead code has to be
- * replaced before anything is worth checking, a held domain is waiting on a
- * decision rather than on DNS, and a verified one is done.
- */
 export function canCheck(state: ClaimViewState): boolean {
-  return (
-    state === "setup_required" ||
-    state === "record_not_found" ||
-    state === "value_mismatch" ||
-    state === "temporary_dns_error"
-  );
+  return BY_STATE[state].checkable;
+}
+
+export function recordWasFound(state: ClaimViewState): boolean {
+  return BY_STATE[state].recordFound;
 }

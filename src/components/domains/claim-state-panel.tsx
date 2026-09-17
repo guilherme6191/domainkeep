@@ -43,19 +43,19 @@ function Panel({
   state,
   icon,
   title,
-  tone,
+  className,
   children,
 }: {
   state: ClaimViewState;
   icon: React.ReactNode;
   title: React.ReactNode;
-  tone?: string;
+  className?: string;
   children?: React.ReactNode;
 }) {
   const action = nextStep(state);
 
   return (
-    <Alert className={cn(PLAIN, tone)}>
+    <Alert className={cn(PLAIN, className)}>
       {icon}
       <AlertTitle className="text-base">{title}</AlertTitle>
       <AlertDescription className="space-y-2">
@@ -133,7 +133,7 @@ function ValueMismatch() {
       state="value_mismatch"
       icon={<AlertCircle />}
       title="We found the record, but its value doesn’t match."
-      tone="text-amber-300"
+      className="text-amber-300"
     >
       <p>
         Replace the found value with the expected one, or add it as another TXT
@@ -281,7 +281,7 @@ function Verified({ claim }: { claim: ClaimView }) {
         <CircleCheck className="motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:fill-mode-backwards motion-safe:delay-150 motion-safe:duration-300" />
       }
       title={`You control ${claim.domain}.`}
-      tone="text-emerald-300"
+      className="text-emerald-300"
     >
       <p>
         {claim.verifiedAt
@@ -305,7 +305,7 @@ function Superseded({ claim }: { claim: ClaimView }) {
       state="superseded"
       icon={<AlertTriangle />}
       title={`Another account proved control of ${claim.domain}.`}
-      tone="text-red-300"
+      className="text-red-300"
     >
       <p>
         {claim.verifiedAt

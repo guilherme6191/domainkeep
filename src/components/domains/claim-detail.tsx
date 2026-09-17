@@ -21,7 +21,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useClaim, useReplaceToken, useVerifyClaim } from "@/hooks/use-claims";
 import { ApiRequestError } from "@/lib/api/client";
 import { toastApiError } from "@/lib/api/toast-error";
-import { codeExpiryIsUrgent, codeIsDead, lastCheckedAt } from "@/lib/claim-state";
+import {
+  codeExpiryIsUrgent,
+  codeIsDead,
+  lastCheckedAt,
+  recordWasFound,
+} from "@/lib/claim-state";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ClaimView, ClaimViewState } from "@/lib/types";
@@ -124,11 +129,8 @@ function CodeExpiry({
  * step, because nothing else can move until it is replaced.
  */
 function ProgressCue({ state }: { state: ClaimViewState }) {
-  const needsNewCode = state === "expired" || state === "superseded";
-  const recordFound =
-    state === "value_mismatch" ||
-    state === "held_by_another" ||
-    state === "verified";
+  const needsNewCode = codeIsDead({ state });
+  const recordFound = recordWasFound(state);
   const verified = state === "verified";
   const current = verified ? 3 : recordFound ? 2 : 1;
 

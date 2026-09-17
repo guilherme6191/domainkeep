@@ -1,12 +1,22 @@
 # Screenshots
 
-Every screen a user can reach, for anyone who would rather look than sign up. Captured from a local build on 2026-09-15.
+Every screen a user can reach, for anyone who would rather look than sign up. Captured from a local build on 2026-09-17.
 
 ## The domains list
 
-Every state names itself, and the next step sits beside it, so the list reads as a to-do list: the domains that still need something sort above the verified ones. The name opens the domain; one menu per row holds Manage and Delete, and the rows another lookup could still change add a Check to the menu and show one under the pointer. Rows can be selected and deleted together; the page size and page number live in the URL.
+Eight states, eight labels, and beside each one the single next step it asks for — so the list reads as a to-do list rather than a status board. The domains with work left sort above the verified ones. The name opens the domain; one menu per row holds the rest.
 
-![The domains list](images/domains-list.jpg)
+![The domains list, each state with its next step](images/domains-list.jpg)
+
+The menu is where a row acts. A check appears only on the states another lookup could still change, so the four that are waiting on DNS offer one and the four that are settled or need a decision do not. Delete is set apart from the two that navigate.
+
+![A row's menu, with Check, Manage and Delete](images/row-menu.jpg)
+
+Narrow enough and the two right-hand columns give up their space to the name, and the next step moves under the badge it belongs to. Guidance that scrolls off the side is guidance nobody reads.
+
+![The list on a phone, the next step under each badge](images/domains-list-narrow.jpg)
+
+Rows can be selected and deleted together; the page size and page number live in the URL.
 
 ## Adding a domain
 
@@ -16,9 +26,9 @@ Validation runs the same normalization the server uses, so the feedback is insta
 
 ## The record and its check
 
-A domain that has never been checked. The domain is the page title, the line under it says which of add record, check and verified the domain is at, and the code's expiry is the one timestamp that can turn amber. The record and the button that checks it share one card, so reading the page top to bottom ends at the action. Type, Name, Value, and TTL are laid out the way a DNS provider asks for them: Name is the provider-style label, the full hostname is spelled out underneath, and every value is copyable.
+A domain that has never been checked. One card holds the whole step: the three-step strip at its head says where the domain is, the record follows, and the single button that acts on it closes the card, so reading top to bottom ends at the action. Type, Name, Value and TTL are laid out the way a DNS provider asks for them: Name is the provider-style label, the full hostname is spelled out underneath, and every value is copyable.
 
-![An unchecked domain with its DNS record card](images/unchecked-record-card.jpg)
+![An unchecked domain, at step one of three](images/unchecked-record-card.jpg)
 
 ## Record not found
 
@@ -28,27 +38,27 @@ The first miss is usually propagation, so the copy says "yet", the code stays va
 
 ## Value mismatch
 
-The record exists but no value matches. The panel opens with the fix, and the expected value sits beside what DNS actually returned, so correcting it is a comparison rather than a guess.
+The record exists but no value matches — the one outcome that proves something was published, so the strip moves to step two. The panel opens with the fix, and the expected value sits beside what DNS actually returned, so correcting it is a comparison rather than a guess.
 
-![Value mismatch, expected versus found](images/value-mismatch.jpg)
+![Value mismatch at step two, expected versus found](images/value-mismatch.jpg)
 
 ## DNS did not respond
 
-A lookup that timed out or was refused. Nothing needs changing; the user retries.
+A lookup that timed out or was refused. Nothing needs changing and nothing was learned about the record, so the strip stays at step one and the user retries.
 
-![Temporary DNS error](images/temporary-dns-error.jpg)
+![A temporary DNS error, with nothing to change](images/temporary-dns-error.jpg)
 
 ## Expired
 
-A code past its seven days. The previous record is shown struck through for reference, and the only way forward is a new code.
+A code past its seven days. The first step renames itself and turns amber, because nothing can move until the code is replaced. The previous record is shown struck through for reference, and the only way forward is a new code.
 
-![An expired code with its previous record](images/expired.jpg)
+![An expired code, its first step renamed](images/expired.jpg)
 
 ## Held elsewhere
 
-The record matched, but another account holds the domain. Nothing has moved and nobody has been told; the transfer runs only on an explicit Take over. This one is the previous holder taking their domain back after being superseded, so the note above the alert names when it moved.
+The record matched, so the strip reaches step two — but another account holds the domain. Nothing has moved and nobody has been told; the transfer runs only on an explicit Take over, and leaving it alone is offered beside it as an answer in its own right.
 
-![Held elsewhere, with the Take over button](images/held-elsewhere.jpg)
+![Held elsewhere, with Take over and Leave it](images/held-elsewhere.jpg)
 
 The confirmation that follows. Cancelling sends nothing; the other account learns of the transfer only if the user goes ahead.
 
@@ -56,15 +66,13 @@ The confirmation that follows. Cancelling sends nothing; the other account learn
 
 ## Verified
 
-Verification is point in time. The record card is gone and the user is told the TXT value can be removed.
+Verification is point in time. All three steps are done, the record is gone from the page, and the user is told the TXT value can be removed.
 
-![A verified domain](images/verified.jpg)
+![A verified domain, all three steps done](images/verified.jpg)
 
 ## Moved away
 
-The previous holder's view after another account proved control: the row in their list, and the claim itself with the date, the invalidated code, and the way back.
-
-![The domains list, with recomendei.me marked Moved away](images/superseded-in-list.jpg)
+The previous holder's view after another account proved control. Their row is the first in the list above; the claim itself carries the date, the invalidated code, and the way back — a new code, which is again the first step.
 
 ![The moved-away claim's detail page](images/superseded-detail.jpg)
 

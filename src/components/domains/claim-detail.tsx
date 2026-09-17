@@ -64,15 +64,18 @@ function Meta({
         {icon}
         {label}
       </dt>
-      <dd className={cn(!urgent && "text-foreground")} title={formatDateTime(iso)}>
+      <dd
+        className={cn("flex items-center gap-1.5", !urgent && "text-foreground")}
+        title={formatDateTime(iso)}
+      >
         {formatRelative(iso)}
+        {action ? (
+          <>
+            <span aria-hidden>·</span>
+            {action}
+          </>
+        ) : null}
       </dd>
-      {action ? (
-        <>
-          <span aria-hidden>·</span>
-          {action}
-        </>
-      ) : null}
     </div>
   );
 }
@@ -136,7 +139,10 @@ function ProgressCue({ state }: { state: ClaimViewState }) {
   ];
 
   return (
-    <ol className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+    <ol
+      aria-label="Progress"
+      className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]"
+    >
       {steps.map((step, index) => {
         const isCurrent = current === index + 1;
         return (
@@ -175,8 +181,8 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     useClaim(claimId);
   const verify = useVerifyClaim(claimId);
   const replaceToken = useReplaceToken(claimId);
-  // Opened by the check that found the holder, and by the held panel's button
-  // on any later visit. The transfer itself is confirmed inside the dialog.
+  // Opened by the check that found the holder, and by the card's Take over
+  // button on any later visit. The transfer is confirmed inside the dialog.
   const [takeoverOpen, setTakeoverOpen] = useState(false);
   // Counts settled checks so a result can animate in without the first paint
   // doing the same, and so a repeated outcome still gets a fresh panel.

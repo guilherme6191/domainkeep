@@ -5,8 +5,10 @@ import { claimView } from "@/test/claim-fixtures";
 import type { ClaimPage, ClaimViewState } from "@/lib/types";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const { verifying } = vi.hoisted(() => ({ verifying: { value: false } }));
+
 vi.mock("@/hooks/use-claims", () => ({
-  useVerifyClaim: () => ({ mutate: vi.fn(), isPending: false }),
+  useVerifyClaim: () => ({ mutate: vi.fn(), isPending: verifying.value }),
 }));
 vi.mock("@/components/domains/delete-domain-dialog", () => ({
   DeleteDomainDialog: () => "Delete domain control",
@@ -87,5 +89,26 @@ describe("checking from the list", () => {
     expect(rowFor(state).includes('aria-label="Check example.com"')).toBe(
       offered,
     );
+  });
+});
+
+describe("a check in flight", () => {
+  // The row says it is working, wherever the check was started from: the
+  // spinner replaces the control even at the width where the menu item is
+  // the only way to reach it.
+  it("marks the row busy and shows the check running", () => {
+    verifying.value = true;
+    try {
+      const html = rowFor("record_not_found");
+      expect(html).toContain('aria-busy="true"');
+      expect(html).toContain("animate-spin");
+      expect(html).not.toContain(">Check</button>");
+    } finally {
+      verifying.value = false;
+    }
+  });
+
+  it("leaves a settled row unmarked", () => {
+    expect(rowFor("record_not_found")).not.toContain("aria-busy");
   });
 });

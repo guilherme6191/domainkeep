@@ -113,11 +113,14 @@ function RowActions({
           aria-label={`Check ${claim.domain}`}
           onClick={onCheck}
           className={cn(
-            "text-muted-foreground hover:text-foreground hidden transition-opacity md:inline-flex",
+            "text-muted-foreground hover:text-foreground transition-opacity",
             // Out of sight until the row is wanted, but never out of reach:
-            // keyboard focus brings it back, and so does a check in flight.
-            "opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100",
-            checking && "opacity-100",
+            // keyboard focus brings it back. A check in flight overrides both
+            // rules, including the breakpoint, so the phone that started it
+            // from the menu can see it running.
+            checking
+              ? "inline-flex opacity-100"
+              : "hidden opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 md:inline-flex",
           )}
         >
           {checking ? <Loader2 className="animate-spin" /> : "Check"}

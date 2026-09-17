@@ -273,7 +273,11 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
     });
   }
 
+  // Guarded rather than disabled, because the link in the meta is small and
+  // easy to double-tap: a second request would invalidate the code the first
+  // just issued.
   function replaceCode() {
+    if (replaceToken.isPending) return;
     replaceToken.mutate(undefined, {
       onError: (error) => toastApiError(error),
     });

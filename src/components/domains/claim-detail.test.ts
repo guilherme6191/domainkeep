@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@/lib/api/client";
+import { nextStep } from "@/lib/claim-state";
 import { NOW, claimView } from "@/test/claim-fixtures";
 import type { ClaimView, ClaimViewState } from "@/lib/types";
 
@@ -216,4 +217,20 @@ describe("claim detail edit eligibility", () => {
       if (verifiedAt) expect(html).toContain("moved to another account");
     },
   );
+});
+
+// What the list promised is what the page asks for, word for word: the panel
+// says what happened, then repeats the list's own next step before explaining
+// anything.
+describe("claim detail outcome panels", () => {
+  it.each([
+    "record_not_found",
+    "value_mismatch",
+    "temporary_dns_error",
+    "held_by_another",
+    "expired",
+    "superseded",
+  ] as const)("opens the %s panel with the list's next step", (state) => {
+    expect(detailFor(state)).toContain(`${nextStep(state)}.</p>`);
+  });
 });

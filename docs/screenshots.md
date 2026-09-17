@@ -4,7 +4,7 @@ Every screen a user can reach, for anyone who would rather look than sign up. Ca
 
 ## The domains list
 
-Every state names itself, and the next step sits beside it, so the list reads as a to-do list: the domains that still need something sort above the verified ones. The name opens the domain; one menu per row holds Check, Manage and Delete, and the rows a further lookup can change also show a Check under the pointer. Rows can be selected and deleted together; the page size and page number live in the URL.
+Every state names itself, and the next step sits beside it, so the list reads as a to-do list: the domains that still need something sort above the verified ones. The name opens the domain; one menu per row holds Manage and Delete, and the rows another lookup could still change add a Check to the menu and show one under the pointer. Rows can be selected and deleted together; the page size and page number live in the URL.
 
 ![The domains list](images/domains-list.jpg)
 
@@ -14,7 +14,7 @@ Validation runs the same normalization the server uses, so the feedback is insta
 
 ![The add-domain dialog rejecting a URL](images/add-domain-validation.jpg)
 
-## The record card
+## The record and its check
 
 A domain that has never been checked. The domain is the page title, the line under it says which of add record, check and verified the domain is at, and the code's expiry is the one timestamp that can turn amber. The record and the button that checks it share one card, so reading the page top to bottom ends at the action. Type, Name, Value, and TTL are laid out the way a DNS provider asks for them: Name is the provider-style label, the full hostname is spelled out underneath, and every value is copyable.
 
@@ -28,7 +28,7 @@ The first miss is usually propagation, so the copy says "yet", the code stays va
 
 ## Value mismatch
 
-The record exists but no value matches. The expected value sits beside what DNS actually returned, so the fix is a comparison rather than a guess.
+The record exists but no value matches. The panel opens with the fix, and the expected value sits beside what DNS actually returned, so correcting it is a comparison rather than a guess.
 
 ![Value mismatch, expected versus found](images/value-mismatch.jpg)
 
@@ -60,13 +60,13 @@ Verification is point in time. The record card is gone and the user is told the 
 
 ![A verified domain](images/verified.jpg)
 
-## Superseded
+## Moved away
 
 The previous holder's view after another account proved control: the row in their list, and the claim itself with the date, the invalidated code, and the way back.
 
-![The domains list, with recomendei.me marked Superseded](images/superseded-in-list.jpg)
+![The domains list, with recomendei.me marked Moved away](images/superseded-in-list.jpg)
 
-![The superseded claim's detail page](images/superseded-detail.jpg)
+![The moved-away claim's detail page](images/superseded-detail.jpg)
 
 ## Deleting a verified domain
 

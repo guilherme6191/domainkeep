@@ -12,9 +12,9 @@ A verified claim can be superseded by another account's fresh DNS proof, once th
 
 The goal is a workflow a user can understand, watch fail, and fix. Three choices carry that:
 
-- **Each outcome names its fix.** Record not found, value mismatch, and DNS not answering are separate states with separate next steps: check the name, compare the value, or wait and retry. A mismatch shows the expected value beside what DNS actually returned.
+- **Each outcome names its fix.** Record not found, wrong value and DNS not answering are separate states with separate next steps: wait and check again, fix the value, or just check again. A mismatch shows the expected value beside what DNS actually returned.
 - **Retrying keeps the code; replacing it is deliberate.** Check again reuses the token until expiry. A missing record may need time or a configuration correction, not a new code. Get a new code is a separate action that invalidates the old value.
-- **Losing a domain isn't silent.** When another account proves control, the previous holder's claim turns Superseded in their list so they don't lose track of it and they receive an email, sent with Resend, linking to that claim. If they still control the DNS, they generate a new code, verify again, and confirm to take it back. Copy across the page guides users to resolve ownership issues with the Domain owner as well.
+- **Losing a domain isn't silent.** When another account proves control, the previous holder's claim reads Moved away in their list, with “Get a new code to reclaim” beside it, so they don't lose track of it and they receive an email, sent with Resend, linking to that claim. If they still control the DNS, they generate a new code, verify again, and confirm to take it back. Copy across the page guides users to resolve ownership issues with the Domain owner as well.
 
 ## Tradeoffs and limitations
 

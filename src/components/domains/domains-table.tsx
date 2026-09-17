@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { DeleteDomainDialog } from "@/components/domains/delete-domain-dialog";
 import { StatusBadge } from "@/components/domains/status-badge";
 import { TablePagination } from "@/components/domains/table-pagination";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -67,16 +68,33 @@ function LastCheckedCell({ iso }: { iso: string | null }) {
 }
 
 /**
- * The state and, below the medium breakpoint, what to do about it. A phone has
- * no room for a column of its own, and guidance that scrolls off the side is
- * guidance the user never reads.
+ * The state and, where the table is too narrow for a column of its own, what
+ * to do about it: guidance that scrolls off the side is guidance the user
+ * never reads.
+ *
+ * A check in flight takes the badge's place, because the badge is the thing
+ * the check is about to change, and because it is the one part of the row that
+ * is on screen at every width.
  */
-function StatusCell({ state }: { state: ClaimViewState }) {
+function StatusCell({
+  state,
+  checking,
+}: {
+  state: ClaimViewState;
+  checking: boolean;
+}) {
   const step = nextStep(state);
 
   return (
     <TableCell className="align-top">
-      <StatusBadge state={state} />
+      {checking ? (
+        <Badge variant="outline" className="text-muted-foreground font-medium">
+          <Loader2 className="animate-spin" />
+          Checking…
+        </Badge>
+      ) : (
+        <StatusBadge state={state} />
+      )}
       {step ? (
         <div className="text-muted-foreground mt-1 text-xs whitespace-normal @2xl:hidden">
           {step}
@@ -88,49 +106,23 @@ function StatusCell({ state }: { state: ClaimViewState }) {
 
 /**
  * Opening the domain is the row's primary action and lives on the name; the
- * menu holds the rest, with delete set apart from navigation. The check is in
- * both places: a quiet button that surfaces when the row is under the pointer
- * or holds keyboard focus, and a menu item, which is the only one of the two a
- * phone can reach.
+ * menu holds the rest, with the check first, because it is the next step, and
+ * delete set apart from navigation.
  *
  * A menu item closes the menu on click, so the dialog is opened by state here
  * rather than by a trigger inside the item.
  */
 function RowActions({
   claim,
-  checking,
   onCheck,
 }: {
   claim: ClaimView;
-  checking: boolean;
   onCheck: () => void;
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const checkable = canCheck(claim.state);
 
   return (
-    <div className="flex items-center justify-end gap-0.5">
-      {checkable ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={`Check ${claim.domain}`}
-          onClick={onCheck}
-          className={cn(
-            "text-muted-foreground hover:text-foreground transition-opacity",
-            // Out of sight until the row is wanted, but never out of reach:
-            // keyboard focus brings it back. A check in flight overrides both
-            // rules, including the breakpoint, so the phone that started it
-            // from the menu can see it running.
-            checking
-              ? "inline-flex opacity-100"
-              : "hidden opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 @2xl:inline-flex",
-          )}
-        >
-          {checking ? <Loader2 className="animate-spin" /> : "Check"}
-        </Button>
-      ) : null}
-
+    <>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
@@ -145,7 +137,7 @@ function RowActions({
           <MoreHorizontalIcon />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {checkable ? (
+          {canCheck(claim.state) ? (
             <DropdownMenuItem onClick={onCheck}>Check</DropdownMenuItem>
           ) : null}
           <DropdownMenuItem render={<Link href={`/domains/${claim.id}`} />}>
@@ -169,7 +161,7 @@ function RowActions({
         onOpenChange={setDeleteOpen}
         onDeleted={() => toast.success(`${claim.domain} deleted.`)}
       />
-    </div>
+    </>
   );
 }
 
@@ -192,9 +184,8 @@ function DomainRow({
 }) {
   const verify = useVerifyClaim(claim.id);
 
-  // Neither control is disabled while the check runs: a disabled button drops
-  // the keyboard focus that is holding it on screen. A second press during the
-  // round trip is simply ignored.
+  // A second press during the round trip is ignored rather than disabled: the
+  // menu item that started it is already closed.
   function runCheck() {
     if (verify.isPending) return;
     verify.mutate(undefined, { onError: (error) => toastApiError(error) });
@@ -204,7 +195,6 @@ function DomainRow({
     <TableRow
       data-state={selected ? "selected" : undefined}
       aria-busy={verify.isPending || undefined}
-      className="group/row"
     >
       <TableCell>
         <Checkbox
@@ -224,17 +214,13 @@ function DomainRow({
           {claim.domain}
         </Link>
       </TableCell>
-      <StatusCell state={claim.state} />
+      <StatusCell state={claim.state} checking={verify.isPending} />
       <TableCell className={cn(NEXT_STEP, "text-muted-foreground")}>
         {nextStep(claim.state)}
       </TableCell>
       <LastCheckedCell iso={lastCheckedAt(claim)} />
       <TableCell className="text-right">
-        <RowActions
-          claim={claim}
-          checking={verify.isPending}
-          onCheck={runCheck}
-        />
+        <RowActions claim={claim} onCheck={runCheck} />
       </TableCell>
     </TableRow>
   );

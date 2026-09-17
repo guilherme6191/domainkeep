@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, type PropsWithChildren } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { claimView } from "@/test/claim-fixtures";
@@ -13,6 +13,19 @@ vi.mock("@/hooks/use-claims", () => ({
 vi.mock("@/components/domains/delete-domain-dialog", () => ({
   DeleteDomainDialog: () => "Delete domain control",
 }));
+// A closed Base UI menu renders nothing, so its items are invisible to a
+// static render. Flattened to plain elements, they are readable as text.
+vi.mock("@/components/ui/dropdown-menu", () => {
+  const Container = ({ children }: PropsWithChildren) =>
+    createElement("div", null, children);
+  return {
+    DropdownMenu: Container,
+    DropdownMenuContent: Container,
+    DropdownMenuItem: Container,
+    DropdownMenuSeparator: () => null,
+    DropdownMenuTrigger: Container,
+  };
+});
 
 const { DomainsTable } = await import("@/components/domains/domains-table");
 
@@ -86,9 +99,8 @@ describe("checking from the list", () => {
     ["superseded", false],
     ["verified", false],
   ] as const)("offers a check on a %s domain: %s", (state, offered) => {
-    expect(rowFor(state).includes('aria-label="Check example.com"')).toBe(
-      offered,
-    );
+    const items = rowFor(state).split("<div>Check</div>").length - 1;
+    expect(items).toBe(offered ? 1 : 0);
   });
 });
 
@@ -101,8 +113,9 @@ describe("a check in flight", () => {
     try {
       const html = rowFor("record_not_found");
       expect(html).toContain('aria-busy="true"');
+      expect(html).toContain("Checking…");
       expect(html).toContain("animate-spin");
-      expect(html).not.toContain(">Check</button>");
+      expect(html).not.toContain("Record not found");
     } finally {
       verifying.value = false;
     }

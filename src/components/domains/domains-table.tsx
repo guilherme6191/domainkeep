@@ -36,13 +36,17 @@ import type { ClaimPage, ClaimView, ClaimViewState } from "@/lib/types";
 // lands on the rows, not the labels.
 const HEAD = "text-muted-foreground text-xs font-medium";
 
-// On a phone the table keeps the name, the status and the menu; the next step
-// rides under the badge there and claims a column of its own once there is
-// room, and the two timestamps return as the viewport widens, most recent
-// first. Nothing scrolls sideways.
-const LAST_CHECKED = "hidden sm:table-cell";
-const ADDED = "hidden md:table-cell";
-const NEXT_STEP = "hidden md:table-cell";
+// Which columns appear is a question about the table's own width, not the
+// window's: the page is capped well below a desktop viewport, so a column that
+// waits for `md` arrives into a container that has no room for it. These are
+// container queries against the wrapper below.
+//
+// A phone keeps the name, the status and the menu, with the next step under
+// the badge; the last check returns first, then the next step gets a column of
+// its own. Added is not here at all — it was costing the domain name a third
+// of its width, and the date a domain was added is a question for its page.
+const LAST_CHECKED = "hidden @lg:table-cell";
+const NEXT_STEP = "hidden @2xl:table-cell";
 
 function LastCheckedCell({ iso }: { iso: string | null }) {
   if (!iso) {
@@ -74,7 +78,7 @@ function StatusCell({ state }: { state: ClaimViewState }) {
     <TableCell className="align-top">
       <StatusBadge state={state} />
       {step ? (
-        <div className="text-muted-foreground mt-1 text-xs whitespace-normal md:hidden">
+        <div className="text-muted-foreground mt-1 text-xs whitespace-normal @2xl:hidden">
           {step}
         </div>
       ) : null}
@@ -120,7 +124,7 @@ function RowActions({
             // from the menu can see it running.
             checking
               ? "inline-flex opacity-100"
-              : "hidden opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 md:inline-flex",
+              : "hidden opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 @2xl:inline-flex",
           )}
         >
           {checking ? <Loader2 className="animate-spin" /> : "Check"}
@@ -225,12 +229,6 @@ function DomainRow({
         {nextStep(claim.state)}
       </TableCell>
       <LastCheckedCell iso={lastCheckedAt(claim)} />
-      <TableCell
-        className={cn(ADDED, "text-muted-foreground")}
-        title={formatDateTime(claim.createdAt)}
-      >
-        {formatRelative(claim.createdAt)}
-      </TableCell>
       <TableCell className="text-right">
         <RowActions
           claim={claim}
@@ -269,7 +267,7 @@ export function DomainsTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border">
+    <div className="@container overflow-hidden rounded-xl border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -285,7 +283,6 @@ export function DomainsTable({
             <TableHead className={HEAD}>Status</TableHead>
             <TableHead className={cn(HEAD, NEXT_STEP)}>Next step</TableHead>
             <TableHead className={cn(HEAD, LAST_CHECKED)}>Last checked</TableHead>
-            <TableHead className={cn(HEAD, ADDED)}>Added</TableHead>
             <TableHead className="w-12 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>

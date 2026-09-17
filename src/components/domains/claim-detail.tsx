@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Check, ChevronRight, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Clock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -16,7 +16,7 @@ import { EditDomainDialog } from "@/components/domains/edit-domain-dialog";
 import { StatusBadge } from "@/components/domains/status-badge";
 import { TakeoverDialog } from "@/components/domains/takeover-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClaim, useReplaceToken, useVerifyClaim } from "@/hooks/use-claims";
 import { ApiRequestError } from "@/lib/api/client";
@@ -122,13 +122,17 @@ function CodeExpiry({
 }
 
 /**
- * Three steps on one line, so the page answers "where am I in this?" before
- * the user reads a word of the card. A step counts as done from what the
- * system has actually seen: a check that found the record clears the first
- * one, whatever it then said about the value. A dead code renames the first
- * step, because nothing else can move until it is replaced.
+ * Three steps at the head of the card, so the page answers "where am I in
+ * this?" before the user reads a word of the outcome below them. A step counts
+ * as done from what the system has actually seen: a check that found the
+ * record clears the first one, whatever it then said about the value. A dead
+ * code renames that step and turns it amber, because nothing else can move
+ * until it is replaced.
+ *
+ * The current step is the loudest thing in the strip; a finished one steps
+ * back to a tick, and one still ahead is fainter again.
  */
-function ProgressCue({ state }: { state: ClaimViewState }) {
+function ProgressSteps({ state }: { state: ClaimViewState }) {
   const needsNewCode = codeIsDead({ state });
   const recordFound = recordWasFound(state);
   const verified = state === "verified";
@@ -143,32 +147,41 @@ function ProgressCue({ state }: { state: ClaimViewState }) {
   return (
     <ol
       aria-label="Progress"
-      className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]"
+      className="flex flex-wrap items-center gap-2 text-sm"
     >
       {steps.map((step, index) => {
         const isCurrent = current === index + 1;
+        const urgent = isCurrent && needsNewCode && index === 0;
+
         return (
           <li
             key={step.label}
             aria-current={isCurrent ? "step" : undefined}
-            className={cn(
-              "flex items-center gap-1.5",
-              !isCurrent && !step.done && "text-muted-foreground/60",
-              isCurrent && "text-foreground font-medium",
-              isCurrent && needsNewCode && index === 0 && "text-amber-300",
-            )}
+            className="flex items-center gap-2"
           >
-            {step.done ? (
-              <Check className="size-3.5" aria-hidden />
-            ) : (
-              <span aria-hidden>{index + 1}.</span>
-            )}
-            {step.label}
+            <span
+              aria-hidden
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums",
+                step.done && "border-border text-muted-foreground",
+                isCurrent && "border-primary/40 bg-primary/15 text-primary",
+                !step.done && !isCurrent && "border-border/60 text-muted-foreground/50",
+                urgent && "border-amber-400/50 bg-amber-500/15 text-amber-300",
+              )}
+            >
+              {step.done ? <Check className="size-3.5" /> : index + 1}
+            </span>
+            <span
+              className={cn(
+                step.done ? "text-muted-foreground" : "text-muted-foreground/50",
+                isCurrent && "text-foreground font-medium",
+                urgent && "text-amber-300",
+              )}
+            >
+              {step.label}
+            </span>
             {index < steps.length - 1 ? (
-              <ChevronRight
-                className="text-muted-foreground/40 size-3.5"
-                aria-hidden
-              />
+              <span aria-hidden className="bg-border ml-1 h-px w-6" />
             ) : null}
           </li>
         );
@@ -416,8 +429,6 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         </dl>
       </div>
 
-      <ProgressCue state={claim.state} />
-
       <p className="sr-only" role="status" aria-live="polite">
         {announcement}
       </p>
@@ -436,6 +447,13 @@ export function ClaimDetail({ claimId }: { claimId: string }) {
         )}
       >
         <Card>
+          {/* Where the domain is in the process heads the card that holds the
+              step, so one block answers where am I, what happened, what to do
+              and the button, in that order. */}
+          <CardHeader className="border-b">
+            <ProgressSteps state={claim.state} />
+          </CardHeader>
+
           <CardContent className="space-y-5">
             <ClaimStatePanel
               claim={claim}

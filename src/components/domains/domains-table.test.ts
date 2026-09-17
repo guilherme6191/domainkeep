@@ -77,11 +77,11 @@ describe("the list shows what to do next", () => {
     expect(rowFor(state)).toContain(step);
   });
 
-  // Finished work should read as finished.
+  // Finished work should read as finished. The subline under the badge is the
+  // element that exists only when there is a step, so its absence is the
+  // assertion: naming particular words would pass for any other wording.
   it("asks nothing of a verified domain", () => {
-    const html = rowFor("verified");
-    expect(html).not.toContain("check again");
-    expect(html).not.toContain("Get a new code");
+    expect(rowFor("verified")).not.toContain("@2xl:hidden");
   });
 });
 

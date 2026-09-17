@@ -182,6 +182,9 @@ describe("claim detail progress cue", () => {
   it.each([
     ["setup_required", "Add record"],
     ["record_not_found", "Add record"],
+    // A resolver that didn't answer taught us nothing about the record, so the
+    // domain is still at the first step.
+    ["temporary_dns_error", "Add record"],
     ["value_mismatch", "Check"],
     ["held_by_another", "Check"],
     ["verified", "Verified"],
@@ -193,6 +196,12 @@ describe("claim detail progress cue", () => {
     expect(current).not.toBeNull();
     expect(current![1]).toContain(step);
     expect(html.split('aria-current="step"')).toHaveLength(2);
+  });
+
+  // Where the current step is says where the domain is; the ticks say what it
+  // has been through. A verified domain has been through all of it.
+  it("ticks every step of a verified domain", () => {
+    expect(detailFor("verified").split("lucide-check")).toHaveLength(4);
   });
 
   it("walks the three steps in order, as a list", () => {
@@ -241,7 +250,9 @@ describe("claim detail superseded history", () => {
 
 // What the list promised is what the page asks for, word for word: the panel
 // says what happened, then repeats the list's own next step before explaining
-// anything.
+// anything. The expectation is built from `nextStep` on purpose — the wording
+// itself is pinned by the list's tests, and what is at stake here is that the
+// panel says the same thing rather than a second version of it.
 describe("claim detail outcome panels", () => {
   it.each([
     "record_not_found",

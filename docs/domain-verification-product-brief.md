@@ -92,17 +92,20 @@ The transfer flow is inspired by [Resend Domain Claim](https://resend.com/docs/d
 
 Enter a domain (e.g. `example.com`), publish the supplied TXT record, and click **Verify domain**. The instructions show type, name (`@` for a root, the relative label for a subdomain), required full hostname, value, and TTL. Copy failures offer manual selection; failed deletion shows an error toast. A DNS check returns success, a diagnosis with a next action, or — when the record matches a domain another account holds — a dialog naming the situation and offering **Take over** or **Cancel**. Cancelling sends nothing and leaves both accounts as they were; the domain stays held, with the same choice available later. Users can correct DNS and retry with the same code, or deliberately replace it and publish the new value.
 
-The list groups outcomes by next action; the detail page gives the diagnosis. The spec owns the [state ladder](domain-verification-technical-spec.md#state-behavior) and [field transitions](domain-verification-technical-spec.md#reassignment-and-atomicity).
+The list names each outcome and the one thing to do about it; the detail page walks that step. The spec owns the [state ladder](domain-verification-technical-spec.md#state-behavior) and [field transitions](domain-verification-technical-spec.md#reassignment-and-atomicity).
 
-| Label | States | What the user does |
+| Label | State | Next step |
 | --- | --- | --- |
 | Verified | `verified` | Nothing |
-| Unchecked | `setup_required` | Publish the record and run the first check |
-| Needs attention | `record_not_found`, `value_mismatch`, `temporary_dns_error`, `expired` | Open the domain; the detail page names the fix |
-| Held elsewhere | `held_by_another` | Open the domain; decide whether to take it over |
-| Superseded | `superseded` | Open the domain; another account took it |
+| Unchecked | `setup_required` | Add the record, then verify |
+| Record not found | `record_not_found` | Wait, then check again |
+| Wrong value | `value_mismatch` | Fix the value, then check again |
+| DNS didn't answer | `temporary_dns_error` | Check again |
+| Held elsewhere | `held_by_another` | Take over, or leave it |
+| Code expired | `expired` | Get a new code |
+| Moved away | `superseded` | Get a new code to reclaim |
 
-"Needs attention" avoids treating possible propagation as failure. "Superseded" remains distinct as the previous holder's in-app signal.
+No label calls a check a failure: a missing record is as often propagation as a mistake. Domains with work left sort above the verified ones, and the four states another lookup can still change can be checked from the list without opening the domain.
 
 ## Success criterion
 

@@ -13,7 +13,7 @@ A verified claim can be superseded by another account's fresh DNS proof, once th
 The goal is a workflow a user can understand, watch fail, and fix. Three choices carry that:
 
 - **Each outcome names its fix.** Record not found, value mismatch, and DNS not answering are separate states with separate next steps: check the name, compare the value, or wait and retry. A mismatch shows the expected value beside what DNS actually returned.
-- **Retrying keeps the code; replacing it is deliberate.** Check again reuses the token until expiry. A missing record may need time or a configuration correction, not a new code. Generate a new code is a separate action that invalidates the old value.
+- **Retrying keeps the code; replacing it is deliberate.** Check again reuses the token until expiry. A missing record may need time or a configuration correction, not a new code. Get a new code is a separate action that invalidates the old value.
 - **Losing a domain isn't silent.** When another account proves control, the previous holder's claim turns Superseded in their list so they don't lose track of it and they receive an email, sent with Resend, linking to that claim. If they still control the DNS, they generate a new code, verify again, and confirm to take it back. Copy across the page guides users to resolve ownership issues with the Domain owner as well.
 
 ## Tradeoffs and limitations
@@ -32,9 +32,9 @@ The claim view has eight states, derived from durable fields in the order shown:
 
 | State | Derived when | Meaning and next action |
 | --- | --- | --- |
-| `superseded` | `supersededAt` is set and `tokenExpiresAt <= supersededAt` | Another account proved control and invalidated this challenge. Generate a new code to try again. |
+| `superseded` | `supersededAt` is set and `tokenExpiresAt <= supersededAt` | Another account proved control and invalidated this challenge. Get a new code to try again. |
 | `verified` | `verifiedAt` is set and `supersededAt` is null | This account currently holds the association. Nothing else is required. |
-| `expired` | `tokenExpiresAt <= now` | The pending challenge is no longer valid. Generate a new code. |
+| `expired` | `tokenExpiresAt <= now` | The pending challenge is no longer valid. Get a new code. |
 | `setup_required` | `lastCheck` is null | Not checked yet, never *failed*. Adding a domain runs no lookup. |
 | `record_not_found` | `lastCheck.result` is `record_not_found` | No `domainkeep-verify=` value answered at the name. Check the name and the prefix, wait, and retry. |
 | `value_mismatch` | `lastCheck.result` is `value_mismatch` | A `domainkeep-verify=` value exists but none matches. Compare, correct, and retry. |
@@ -43,7 +43,20 @@ The claim view has eight states, derived from durable fields in the order shown:
 
 `superseded` comes first because it can coexist with a historical `verifiedAt`; once the owner generates a new code, the claim is an ordinary pending one again.
 
-The domains list collapses these into five badges by next action: Verified, Unchecked, Needs attention (the three diagnostic states and expired, never called "failed" because the cause might be propagation - the goal at the list is to know which ones need attention for further action and it's based on progressive disclosure, and to make it scannable easily), Held elsewhere, which asks for a decision rather than a fix, and Superseded, which stays separate as the previous holder's in-app takeover signal. The detail page names the exact state.
+The domains list names every state and puts its next step beside it, so a page of pending domains says what each one needs without being opened:
+
+| Badge | State | Next step |
+| --- | --- | --- |
+| Verified | `verified` | — |
+| Unchecked | `setup_required` | Add the record, then verify |
+| Record not found | `record_not_found` | Wait, then check again |
+| Wrong value | `value_mismatch` | Fix the value, then check again |
+| DNS didn't answer | `temporary_dns_error` | Check again |
+| Held elsewhere | `held_by_another` | Take over, or leave it |
+| Code expired | `expired` | Get a new code |
+| Moved away | `superseded` | Get a new code to reclaim |
+
+Nothing is called "failed": a missing record is as often propagation as a mistake. The next-step words are written once and read by the list, by the domain page's progress line and by its outcome panels, so what the user reads in the list is what they find on the page. Domains with work left sort above the verified ones, and the four states another lookup can still change can be checked from the list itself.
 
 ## Architecture
 
@@ -64,7 +77,7 @@ The exclusivity rule lives in Postgres, not in application code: a partial uniqu
 | `PATCH /api/claims/:id` | Fix a typo in the domain. Refused once the claim has ever verified. |
 | `POST /api/claims/:id/verify` | At most one DNS lookup. Proves control; never transfers a domain another account holds. |
 | `POST /api/claims/:id/take-over` | The confirmed transfer. Looks DNS up again, then supersedes the previous holder. |
-| `POST /api/claims/:id/replace-token` | Generate a new code, on purpose or after expiry. |
+| `POST /api/claims/:id/replace-token` | Get a new code, on purpose or after expiry. |
 | `DELETE /api/claims/:id` | Remove the claim. A verified domain becomes free again. |
 
 The list is paged from the URL (40 rows by default, 80 or 120 on request), so a page is a shareable address and a reload lands where you were. Rows can be selected per page and deleted together; the confirmation says how many of them are verified, because those release their domains.

@@ -4,7 +4,7 @@ Every screen a user can reach, for anyone who would rather look than sign up. Ca
 
 ## The domains list
 
-Badges collapse the claim states by next action: Verified, Unchecked, Needs attention, Held elsewhere, Superseded. The name opens the domain; one menu per row holds Manage and Delete. Rows can be selected and deleted together; the page size and page number live in the URL.
+Every state names itself, and the next step sits beside it, so the list reads as a to-do list: the domains that still need something sort above the verified ones. The name opens the domain; one menu per row holds Check, Manage and Delete, and the rows a further lookup can change also show a Check under the pointer. Rows can be selected and deleted together; the page size and page number live in the URL.
 
 ![The domains list](images/domains-list.jpg)
 
@@ -16,7 +16,7 @@ Validation runs the same normalization the server uses, so the feedback is insta
 
 ## The record card
 
-A domain that has never been checked. The domain is the page title, the check stands beside it, and the code's expiry is the one timestamp that can turn amber. Type, Name, Value, and TTL are laid out the way a DNS provider asks for them: Name is the provider-style label, the full hostname is spelled out underneath, and every value is copyable.
+A domain that has never been checked. The domain is the page title, the line under it says which of add record, check and verified the domain is at, and the code's expiry is the one timestamp that can turn amber. The record and the button that checks it share one card, so reading the page top to bottom ends at the action. Type, Name, Value, and TTL are laid out the way a DNS provider asks for them: Name is the provider-style label, the full hostname is spelled out underneath, and every value is copyable.
 
 ![An unchecked domain with its DNS record card](images/unchecked-record-card.jpg)
 

@@ -14,7 +14,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClaims } from "@/hooks/use-claims";
@@ -70,7 +69,7 @@ export function DomainsList({
             <Skeleton className="size-8" />
           </div>
         </div>
-        <div className="overflow-hidden rounded-xl border">
+        <div className="@container overflow-hidden rounded-xl border">
           <div className="border-b px-4 py-3">
             <Skeleton className="h-4 w-1/3" />
           </div>
@@ -79,9 +78,10 @@ export function DomainsList({
               <Skeleton className="size-4" />
               <Skeleton className="h-4 w-48" />
               <Skeleton className="h-5 w-20 rounded-4xl" />
-              {/* The next step, which the loaded row only shows from `md`. */}
-              <Skeleton className="hidden h-4 w-36 md:block" />
-              <Skeleton className="ml-auto h-4 w-24" />
+              {/* The two columns the loaded table only shows once its own
+                  width allows, at the same container widths it uses. */}
+              <Skeleton className="hidden h-4 w-36 @2xl:block" />
+              <Skeleton className="ml-auto hidden h-4 w-24 @lg:block" />
             </div>
           ))}
           <div className="flex items-center justify-between border-t px-4 py-3">
@@ -118,7 +118,15 @@ export function DomainsList({
       <div className="mx-auto max-w-md space-y-4 py-10">
         <Card>
           <CardHeader>
-            <CardTitle>Add a domain</CardTitle>
+            {/* This view replaces the list, heading and all, so without an h1
+                here the page has no heading at all. CardTitle is a plain div
+                and takes no element, so its definition is spelled out. */}
+            <h1
+              data-slot="card-title"
+              className="font-heading text-base leading-snug font-medium"
+            >
+              Add a domain
+            </h1>
             <CardDescription>
               Verify that you control a domain by adding one DNS record.
             </CardDescription>

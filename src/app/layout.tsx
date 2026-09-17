@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: { default: "Domainkeep", template: "%s · Domainkeep" },
   description: "Prove you control a domain by adding one DNS record.",
 };
+
+// The page background, so a phone's browser chrome matches the page instead of
+// framing it in white. Written as sRGB rather than the `--background` token:
+// the token is oklch, which not every browser parses here.
+export const viewport: Viewport = { themeColor: "#090b0f" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

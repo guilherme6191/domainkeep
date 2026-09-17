@@ -125,6 +125,7 @@ export function DnsRecord({
             <Cell label="Name">
               <span className="flex items-center gap-1">
                 <span
+                  translate="no"
                   className={cn("min-w-0 truncate", inactive && "line-through")}
                   title={name}
                 >
@@ -140,7 +141,11 @@ export function DnsRecord({
             </Cell>
             <Cell label="Value">
               <span className="flex items-center gap-1">
-                <span className={cn(inactive && "line-through")} title={value}>
+                <span
+                  translate="no"
+                  className={cn(inactive && "line-through")}
+                  title={value}
+                >
                   <ShortValue value={value} />
                 </span>
                 {inactive ? null : (
@@ -159,7 +164,9 @@ export function DnsRecord({
         <div className="text-muted-foreground pt-3.5 text-sm">
           <p>
             The record&rsquo;s full name must be{" "}
-            <span className="text-foreground font-mono">{hostname}</span>
+            <span translate="no" className="text-foreground font-mono">
+              {hostname}
+            </span>
             {inactive ? null : (
               <CopyButton
                 value={hostname}

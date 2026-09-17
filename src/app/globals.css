@@ -90,6 +90,10 @@
  * (emerald, amber, red) stay reserved for state.
  */
 .dark {
+  /* Tells the browser the page is dark, so scrollbars, form controls and any
+     other native chrome come up dark too. */
+  color-scheme: dark;
+
   --background: oklch(0.15 0.008 262);
   --foreground: oklch(0.975 0.003 262);
   --card: oklch(0.195 0.008 262);

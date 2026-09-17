@@ -180,8 +180,11 @@ function ProgressSteps({ state }: { state: ClaimViewState }) {
             >
               {step.label}
             </span>
+            {/* Dropped where the strip is too narrow to hold three steps on
+                one line: a connector that survives the wrap dangles off the
+                end of it, pointing at nothing. */}
             {index < steps.length - 1 ? (
-              <span aria-hidden className="bg-border ml-1 h-px w-6" />
+              <span aria-hidden className="bg-border ml-1 hidden h-px w-6 @sm:block" />
             ) : null}
           </li>
         );

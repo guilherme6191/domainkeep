@@ -33,6 +33,12 @@ function Mono({ children }: { children: React.ReactNode }) {
 // drops the alert's border and background and keeps its role and its layout.
 const PLAIN = "border-0 bg-transparent p-0";
 
+// The alert's description balances its lines, which suits the one-line note it
+// was drawn for and not the paragraphs these panels carry: on a phone it
+// squeezes body copy into a narrow ragged column. `text-pretty` leaves the
+// measure alone and only guards against a widow.
+const BODY = "text-pretty";
+
 // Each outcome has its own glyph, so the shape says what happened before the
 // words do: nothing found, a mismatch, no answer, someone else, out of time.
 //
@@ -58,7 +64,7 @@ function Panel({
     <Alert className={cn(PLAIN, className)}>
       {icon}
       <AlertTitle className="text-base">{title}</AlertTitle>
-      <AlertDescription className="space-y-2">
+      <AlertDescription className={cn(BODY, "space-y-2")}>
         {action ? (
           <p className="text-foreground font-medium">{action}.</p>
         ) : null}
@@ -166,7 +172,10 @@ export function ExpectedVsFound({ claim }: { claim: ClaimView }) {
             Expected
           </div>
           <div className="flex items-start gap-2">
-            <code className="min-w-0 flex-1 font-mono text-sm leading-relaxed break-all">
+            <code
+              translate="no"
+              className="min-w-0 flex-1 font-mono text-sm leading-relaxed break-all"
+            >
               {claim.recordValue}
             </code>
             <CopyButton
@@ -197,7 +206,10 @@ export function ExpectedVsFound({ claim }: { claim: ClaimView }) {
                   >
                     ×
                   </span>
-                  <code className="text-muted-foreground min-w-0 font-mono text-sm leading-relaxed break-all">
+                  <code
+                    translate="no"
+                    className="text-muted-foreground min-w-0 font-mono text-sm leading-relaxed break-all"
+                  >
                     {value}
                   </code>
                 </li>
@@ -319,8 +331,12 @@ function Superseded({ claim }: { claim: ClaimView }) {
   );
 }
 
+// History, for the states whose panel says nothing about it. The reclaim path
+// ends on `held_by_another`, whose panel already names the account holding the
+// domain and offers the way back: the note there is a louder, redder
+// restatement of what the user is already reading.
 function SupersededNote({ claim }: { claim: ClaimView }) {
-  if (!claim.supersededAt) return null;
+  if (!claim.supersededAt || claim.state === "held_by_another") return null;
   return (
     <p className="text-sm text-red-300/90">
       This domain moved to another account on{" "}

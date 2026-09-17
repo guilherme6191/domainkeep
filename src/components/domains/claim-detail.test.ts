@@ -219,6 +219,26 @@ describe("claim detail edit eligibility", () => {
   );
 });
 
+// A domain that moved and was then proved again is the ordinary reclaim path,
+// and its panel already names the account that holds it. The history note
+// belongs to the states whose panel says nothing about it.
+describe("claim detail superseded history", () => {
+  it.each([
+    ["held_by_another", false],
+    ["record_not_found", true],
+  ] as const)("shows the note on %s: %s", (state, expected) => {
+    useClaimMock.mockReturnValue({
+      data: claimView({
+        state,
+        lastCheck: LAST_CHECK[state],
+        verifiedAt: CHECKED_AT,
+        supersededAt: CHECKED_AT,
+      }),
+    });
+    expect(render().includes("moved to another account")).toBe(expected);
+  });
+});
+
 // What the list promised is what the page asks for, word for word: the panel
 // says what happened, then repeats the list's own next step before explaining
 // anything.

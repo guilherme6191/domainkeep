@@ -79,6 +79,8 @@ export function DomainsList({
               <Skeleton className="size-4" />
               <Skeleton className="h-4 w-48" />
               <Skeleton className="h-5 w-20 rounded-4xl" />
+              {/* The next step, which the loaded row only shows from `md`. */}
+              <Skeleton className="hidden h-4 w-36 md:block" />
               <Skeleton className="ml-auto h-4 w-24" />
             </div>
           ))}
